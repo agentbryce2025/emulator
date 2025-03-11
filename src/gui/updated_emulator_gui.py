@@ -380,18 +380,22 @@ class EmulatorGUI(QMainWindow):
         self.log_text.setLineWrapMode(QTextEdit.NoWrap)
         self.log_text.setStyleSheet("font-family: monospace;")
         
-        # Create a log handler that updates the log text
+        # Create a log handler that updates the log text in a thread-safe way
+        class QTextEditLoggerSignals(QObject):
+            appendPlainText = pyqtSignal(str)
+            
         class QTextEditLogger(logging.Handler):
             def __init__(self, text_edit):
                 super().__init__()
                 self.text_edit = text_edit
+                self.signals = QTextEditLoggerSignals()
+                self.signals.appendPlainText.connect(self.text_edit.append)
                 self.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
                 
             def emit(self, record):
                 msg = self.format(record)
-                # This is executed in the logging thread, so we need to use signals/slots
-                # or similar mechanism to update the UI safely
-                self.text_edit.append(msg)
+                # Use signal to safely update the text edit from any thread
+                self.signals.appendPlainText.emit(msg)
                 
         # Add the handler to the root logger
         log_handler = QTextEditLogger(self.log_text)

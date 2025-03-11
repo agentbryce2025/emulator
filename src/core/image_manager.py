@@ -36,13 +36,23 @@ class ImageManager:
         "6.0-r3"
     ]
     
-    # Direct download URLs for specific images
+    # Direct download URLs for specific images with multiple mirrors for each
     DIRECT_URLS = {
         "9.0-r2": {
-            "x86_64": "https://iweb.dl.sourceforge.net/project/android-x86/Release%209.0/android-x86_64-9.0-r2.iso"
+            "x86_64": [
+                "https://osdn.net/frs/redir.php?m=nchc&f=android-x86%2F71931%2Fandroid-x86_64-9.0-r2.iso",
+                "https://sourceforge.net/projects/android-x86/files/Release%209.0/android-x86_64-9.0-r2.iso/download",
+                "https://ftp.nluug.nl/pub/os/Linux/distr/android-x86/Release%209.0/android-x86_64-9.0-r2.iso",
+                "https://osdn.mirror.constant.com/android-x86/71931/android-x86_64-9.0-r2.iso"
+            ]
         },
         "8.1-r6": {
-            "x86_64": "https://iweb.dl.sourceforge.net/project/android-x86/Release%208.1/android-x86_64-8.1-r6.iso"
+            "x86_64": [
+                "https://osdn.net/frs/redir.php?m=nchc&f=android-x86%2F71931%2Fandroid-x86_64-8.1-r6.iso",
+                "https://sourceforge.net/projects/android-x86/files/Release%208.1/android-x86_64-8.1-r6.iso/download",
+                "https://ftp.nluug.nl/pub/os/Linux/distr/android-x86/Release%208.1/android-x86_64-8.1-r6.iso",
+                "https://osdn.mirror.constant.com/android-x86/71931/android-x86_64-8.1-r6.iso"
+            ]
         }
     }
     
@@ -125,13 +135,32 @@ class ImageManager:
         # Official files are typically hosted in a version-specific directory
         version_dir = version
         
-        # Check if we have a direct URL
+        # Check if we have direct URLs
         download_url = None
+        
         if version in self.DIRECT_URLS and image_type in self.DIRECT_URLS[version]:
-            download_url = self.DIRECT_URLS[version][image_type]
-            logger.info(f"Using direct download URL for {version} {image_type}: {download_url}")
-        else:
-            # Find download URL by trying mirrors
+            # Try each URL in order until one works
+            direct_urls = self.DIRECT_URLS[version][image_type]
+            url_errors = []
+            
+            for url in direct_urls:
+                try:
+                    logger.info(f"Trying direct URL for {version} {image_type}: {url}")
+                    
+                    # Do a quick HEAD request to see if the URL is accessible
+                    response = requests.head(url, allow_redirects=True, timeout=10)
+                    if response.status_code in [200, 301, 302]:
+                        download_url = url
+                        logger.info(f"Using direct download URL: {download_url}")
+                        break
+                except Exception as e:
+                    error_msg = f"URL {url} failed: {str(e)}"
+                    url_errors.append(error_msg)
+                    logger.warning(error_msg)
+        
+        # If no direct URL worked, try fallback using mirrors
+        if not download_url:
+            logger.warning("Direct URLs failed, trying fallback mirrors")
             for mirror in self.MIRROR_LIST:
                 try:
                     if "osdn.net" in mirror:
@@ -142,15 +171,17 @@ class ImageManager:
                         url = f"{mirror}{version_dir}/{image_filename}"
                         
                     # Check if URL exists (HEAD request)
+                    logger.info(f"Trying mirror URL: {url}")
                     response = requests.head(url, allow_redirects=True, timeout=10)
-                    if response.status_code == 200:
+                    if response.status_code in [200, 301, 302]:
                         download_url = url
+                        logger.info(f"Using mirror URL: {download_url}")
                         break
                 except Exception as e:
                     logger.warning(f"Failed to check mirror {mirror}: {str(e)}")
                 
         if not download_url:
-            logger.error(f"Could not find download URL for Android-x86 {version} {image_type}")
+            logger.error(f"Could not find working download URL for Android-x86 {version} {image_type}")
             return None
             
         # Start download in a separate thread
@@ -172,21 +203,44 @@ class ImageManager:
         return str(target_path)
         
     def _download_file(self, url, target_path, callback=None):
-        """Download a file with progress tracking."""
+        """Download a file with progress tracking and better error handling."""
+        temp_path = None
         try:
-            # Download to temporary file first
+            # Create temporary file first
             with tempfile.NamedTemporaryFile(delete=False) as temp_file:
                 temp_path = temp_file.name
-                
+            
+            logger.info(f"Starting download from {url} to temporary file {temp_path}")
+            
+            # Setup session with longer timeouts and retry capability
+            session = requests.Session()
+            session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
+            
             # Stream download with progress updates
-            response = requests.get(url, stream=True, timeout=3600)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = session.get(
+                url, 
+                stream=True, 
+                timeout=60,  # Connect timeout
+                headers=headers
+            )
+            response.raise_for_status()  # Raise an error for bad responses
+            
             total_size = int(response.headers.get('content-length', 0))
+            if total_size == 0:
+                logger.warning(f"Content length not provided for {url}, download progress will not be accurate")
+                total_size = 800000000  # Assume approximately 800 MB for Android-x86 ISO
+            
             downloaded = 0
+            last_percent = 0
+            start_time = time.time()
             
             with open(temp_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=1024*1024):  # Use 1MB chunks
                     if self.download_cancel.is_set():
-                        logger.info("Download cancelled")
+                        logger.info("Download cancelled by user")
                         os.unlink(temp_path)
                         self.current_download = None
                         self.download_progress = 0
@@ -199,28 +253,58 @@ class ImageManager:
                         # Update progress
                         if total_size > 0:
                             progress = int((downloaded / total_size) * 100)
+                            
+                            # Only log progress updates on significant changes
+                            if progress >= last_percent + 5:
+                                elapsed = time.time() - start_time
+                                download_rate = downloaded / elapsed if elapsed > 0 else 0
+                                rate_mb = download_rate / (1024 * 1024)
+                                
+                                logger.info(f"Download progress: {progress}% ({downloaded/1048576:.1f} MB / "
+                                            f"{total_size/1048576:.1f} MB) at {rate_mb:.1f} MB/s")
+                                last_percent = progress
+                            
                             self.download_progress = progress
                             
                             if callback and callable(callback):
                                 callback(progress)
-                                
-            # Move to final location
+            
+            # Download completed, move to final location
+            logger.info(f"Download completed, moving {temp_path} to {target_path}")
             shutil.move(temp_path, target_path)
-            logger.info(f"Downloaded {url} to {target_path}")
+            logger.info(f"Successfully downloaded {url} to {target_path}")
             
-            # Verify download
-            self._verify_image(target_path)
+            # Verify the downloaded image
+            if not self._verify_image(target_path):
+                logger.warning("The downloaded image couldn't be verified as a valid ISO file")
             
+            self._available_images = None  # Refresh available images list
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            error_type = type(e).__name__
+            logger.error(f"Download failed with {error_type}: {str(e)}")
+            if isinstance(e, requests.exceptions.ConnectionError):
+                logger.error("Connection error - check your internet connection")
+            elif isinstance(e, requests.exceptions.Timeout):
+                logger.error("Connection timed out - the server may be busy or unreachable")
+            elif isinstance(e, requests.exceptions.HTTPError):
+                logger.error(f"HTTP error {e.response.status_code} - the file may not exist")
         except Exception as e:
-            logger.error(f"Download failed: {str(e)}")
-            try:
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-            except:
-                pass
-        finally:
-            self.current_download = None
-            self.download_progress = 0
+            logger.error(f"Download failed with unexpected error: {str(e)}")
+        
+        # Cleanup on error
+        try:
+            if temp_path and os.path.exists(temp_path):
+                os.unlink(temp_path)
+                logger.info(f"Cleaned up temporary file {temp_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"Error cleaning up temporary file: {str(cleanup_error)}")
+        
+        # Reset download state
+        self.current_download = None
+        self.download_progress = 0
+        return False
             
     def cancel_download(self):
         """Cancel the current download."""

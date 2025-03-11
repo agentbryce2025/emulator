@@ -68,6 +68,41 @@ This project aims to create an Android phone emulator that is undetectable by Li
 python main.py --help
 ```
 
+### Troubleshooting Common Issues
+
+#### Image Download Errors
+If you're experiencing timeouts or errors while downloading Android images:
+
+1. **Retry the download**: Downloads may fail due to temporary server issues
+2. **Use a different network**: Some networks may block or limit large downloads
+3. **Manual download**: You can manually download Android-x86 images from:
+   - [Android-x86 Project Website](https://www.android-x86.org/download.html)
+   - [SourceForge](https://sourceforge.net/projects/android-x86/files/)
+   - After downloading, place the ISO file in `~/.config/undetected-emulator/images/` (Linux/macOS) or `C:\Users\YOUR_USERNAME\.config\undetected-emulator\images\` (Windows)
+
+#### QEMU Not Found Error
+If you see "QEMU not found" errors:
+
+1. **Install QEMU**:
+   - Windows: Download from [QEMU for Windows](https://qemu.weilnetz.de/w64/)
+   - macOS: `brew install qemu`
+   - Linux: `sudo apt install qemu-system-x86`
+   
+2. **Add QEMU to PATH**: Ensure the QEMU installation directory is in your system PATH
+
+3. **Specify QEMU path**: In the emulator GUI, go to Settings tab and provide the full path to the QEMU executable
+
+#### GUI Display Issues
+If you encounter problems with the GUI display:
+
+1. **Qt dependencies**: Install required Qt libraries
+   - Windows: `pip install PyQt5`
+   - Linux: `sudo apt install python3-pyqt5`
+
+2. **Font issues**: If text appears garbled, try changing the font settings in the interface
+
+3. **Scaling problems**: On high DPI displays, try setting the environment variable: `QT_AUTO_SCREEN_SCALE_FACTOR=1`
+
 ## Project Goals
 
 1. Create a fully functional Android emulator with a visual GUI
