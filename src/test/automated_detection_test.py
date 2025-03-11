@@ -37,8 +37,9 @@ logger = logging.getLogger(__name__)
 class AutomatedDetectionTest:
     """Framework for automated testing of emulator detection bypass."""
     
-    def __init__(self, output_dir=None):
+    def __init__(self, output_dir=None, dry_run=False):
         """Initialize the automated testing framework."""
+        self.dry_run = dry_run
         self.output_dir = output_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
         os.makedirs(self.output_dir, exist_ok=True)
         
@@ -98,8 +99,11 @@ class AutomatedDetectionTest:
         # Apply hardware spoofing from profile
         self.hardware_spoofer.apply_profile(device_profile)
         
-        # Start the emulator
-        if not self.qemu.start():
+        # Start the emulator (unless in dry-run mode)
+        if self.dry_run:
+            logger.info("Running in dry-run mode, not starting actual emulator")
+            return True
+        elif not self.qemu.start():
             logger.error("Failed to start emulator")
             return False
             

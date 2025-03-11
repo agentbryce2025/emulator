@@ -80,6 +80,11 @@ def main():
         action="store_true", 
         help="Only test against LinkedIn detection"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run in dry-run mode (don't actually start emulator)"
+    )
     
     args = parser.parse_args()
     
@@ -117,7 +122,7 @@ def main():
     logger.info(f"Test results will be saved to: {output_dir}")
     
     # Create test framework
-    test_framework = AutomatedDetectionTest(output_dir=output_dir)
+    test_framework = AutomatedDetectionTest(output_dir=output_dir, dry_run=args.dry_run)
     
     # Set up test cases
     test_cases = []

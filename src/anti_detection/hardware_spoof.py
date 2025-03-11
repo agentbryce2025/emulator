@@ -42,6 +42,16 @@ class HardwareSpoofer:
         except Exception as e:
             logger.error(f"Error loading device profiles: {str(e)}")
             
+    def apply_profile(self, profile):
+        """Apply a device profile dictionary directly."""
+        if not profile:
+            logger.error("No profile provided")
+            return False
+            
+        logger.info(f"Applying hardware profile: {profile.get('manufacturer', 'Unknown')} {profile.get('model', 'Unknown')}")
+        self.current_profile = profile
+        return True
+    
     def load_profile(self, profile_name):
         """Load a specific device profile."""
         profile_file = os.path.join(self.profile_path, f"{profile_name}.json")
