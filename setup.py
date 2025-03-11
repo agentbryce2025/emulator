@@ -21,6 +21,9 @@ setup(
         "python-magic",
         "python-xlib",
         "pycryptodomex",
+        "scikit-learn",
+        "joblib",
+        "matplotlib",
     ],
     entry_points={
         "console_scripts": [

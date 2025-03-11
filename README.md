@@ -54,7 +54,7 @@ Our approach will implement countermeasures for each:
 
 1. **Hardware Spoofing**:
    - Customized Build.prop with realistic device identifiers
-   - Virtual sensor data that mimics real devices
+   - Machine learning-based sensor data generation that mimics real devices
    - Spoofed IMEI, Device ID, and MAC address
 
 2. **Virtualization Masking**:

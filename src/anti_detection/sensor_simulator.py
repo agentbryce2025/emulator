@@ -13,6 +13,14 @@ import os
 from pathlib import Path
 import threading
 
+# Import ML sensor generator if available
+try:
+    from .ml_sensor_generator import MLSensorGenerator
+    ML_GENERATOR_AVAILABLE = True
+except ImportError:
+    ML_GENERATOR_AVAILABLE = False
+    logging.warning("ML sensor generator not available. Using basic sensor simulation.")
+
 logger = logging.getLogger(__name__)
 
 class SensorSimulator:
@@ -29,6 +37,22 @@ class SensorSimulator:
         self.simulation_thread = None
         self.sensor_values = {}
         self.noise_factor = 0.05  # Base noise factor
+        
+        # Initialize ML generator if available
+        self.ml_generator = None
+        self.use_ml_generation = False
+        if ML_GENERATOR_AVAILABLE:
+            try:
+                self.ml_generator = MLSensorGenerator()
+                # Try to train models if they don't exist
+                if not any(info["trained"] for _, info in self.ml_generator.get_model_info().items()):
+                    logger.info("Training ML models for sensor simulation...")
+                    self.ml_generator.train_models()
+                self.use_ml_generation = True
+                logger.info("ML sensor generation enabled")
+            except Exception as e:
+                logger.error(f"Error initializing ML sensor generator: {e}")
+                self.use_ml_generation = False
         
         # Ensure profile directory exists
         os.makedirs(self.profile_path, exist_ok=True)
@@ -103,20 +127,31 @@ class SensorSimulator:
             logger.error(f"Error saving profile {profile_name}: {str(e)}")
             return False
             
-    def create_device_profile(self, device_type, activity_type="stationary"):
-        """Create a new sensor profile based on device type and activity."""
+    def create_device_profile(self, device_type, activity_type="stationary", position="flat", use_ml=True):
+        """
+        Create a new sensor profile based on device type and activity.
+        
+        Args:
+            device_type: Type of device ('smartphone', 'tablet', 'smartwatch')
+            activity_type: Activity being performed ('stationary', 'walking', 'running', 'driving')
+            position: Device position ('flat', 'tilted', 'vertical', 'upside_down')
+            use_ml: Whether to use ML-generated sensor patterns if available
+        """
         # Device types: smartphone, tablet, smartwatch
         # Activity types: stationary, walking, running, driving
+        # Positions: flat, tilted, vertical, upside_down
         
         profile = {
             "device_type": device_type,
             "activity_type": activity_type,
+            "position": position,
             "sensors": {},
             "simulation_parameters": {
                 "noise_factor": self.noise_factor,
                 "update_frequency": 50,  # Hz
                 "drift_enabled": True,
                 "drift_factor": 0.001,
+                "use_ml": use_ml and self.use_ml_generation
             }
         }
         
@@ -253,73 +288,131 @@ class SensorSimulator:
             }
             
         # Adjust for activity type
-        self._adjust_for_activity(profile, activity_type)
+        self._adjust_for_activity(profile, activity_type, position)
         
         self.current_profile = profile
         return profile
     
-    def _adjust_for_activity(self, profile, activity_type):
-        """Adjust sensor parameters based on activity type."""
-        if activity_type == "stationary":
-            # Already the default
-            pass
-        elif activity_type == "walking":
-            # Increase accelerometer and gyroscope variance
-            if "accelerometer" in profile["sensors"]:
-                for axis in ["x", "y", "z"]:
-                    profile["sensors"]["accelerometer"]["variance"][axis] *= 3
-            if "gyroscope" in profile["sensors"]:
-                for axis in ["x", "y", "z"]:
-                    profile["sensors"]["gyroscope"]["variance"][axis] *= 2.5
-                    
-            # Add walking pattern
+    def _adjust_for_activity(self, profile, activity_type, position="flat"):
+        """
+        Adjust sensor parameters based on activity type and position.
+        
+        Args:
+            profile: The sensor profile to adjust
+            activity_type: Activity being performed ('stationary', 'walking', 'running', 'driving')
+            position: Device position ('flat', 'tilted', 'vertical', 'upside_down')
+        """
+        # Check if ML should be used for pattern generation
+        use_ml = profile["simulation_parameters"].get("use_ml", False) and self.use_ml_generation
+        
+        if use_ml:
+            # Use ML for pattern generation
             profile["simulation_parameters"]["patterns"] = {
                 "accelerometer": {
-                    "type": "sine",
-                    "amplitude": {"x": 0.8, "y": 1.2, "z": 1.5},
-                    "frequency": {"x": 1.8, "y": 1.8, "z": 1.8},
-                    "phase": {"x": 0, "y": math.pi/2, "z": math.pi/4},
+                    "type": "ml_generated",
+                    "activity": activity_type,
+                    "position": position
+                },
+                "gyroscope": {
+                    "type": "ml_generated",
+                    "activity": activity_type,
+                    "position": position
+                },
+                "magnetometer": {
+                    "type": "ml_generated",
+                    "activity": activity_type,
+                    "position": position
                 }
             }
-        elif activity_type == "running":
-            # Significantly increase accelerometer and gyroscope variance
-            if "accelerometer" in profile["sensors"]:
-                for axis in ["x", "y", "z"]:
-                    profile["sensors"]["accelerometer"]["variance"][axis] *= 6
-            if "gyroscope" in profile["sensors"]:
-                for axis in ["x", "y", "z"]:
-                    profile["sensors"]["gyroscope"]["variance"][axis] *= 5
-                    
-            # Add running pattern (faster than walking)
-            profile["simulation_parameters"]["patterns"] = {
-                "accelerometer": {
-                    "type": "sine",
-                    "amplitude": {"x": 1.5, "y": 2.5, "z": 3.0},
-                    "frequency": {"x": 3.0, "y": 3.0, "z": 3.0},
-                    "phase": {"x": 0, "y": math.pi/2, "z": math.pi/4},
-                }
-            }
-        elif activity_type == "driving":
-            # Moderate increase in variance with occasional larger movements
-            if "accelerometer" in profile["sensors"]:
-                for axis in ["x", "y", "z"]:
-                    profile["sensors"]["accelerometer"]["variance"][axis] *= 2
-            if "gyroscope" in profile["sensors"]:
-                for axis in ["x", "y", "z"]:
-                    profile["sensors"]["gyroscope"]["variance"][axis] *= 1.5
             
-            # Add driving pattern (mix of smooth and occasional jolts)
-            profile["simulation_parameters"]["patterns"] = {
-                "accelerometer": {
-                    "type": "mixed",
-                    "smooth": {
-                        "amplitude": {"x": 0.3, "y": 0.3, "z": 0.2},
-                        "frequency": {"x": 0.5, "y": 0.5, "z": 0.5},
-                    },
-                    "jolt_probability": 0.01,  # 1% chance of jolt per update
-                    "jolt_magnitude": {"x": 3.0, "y": 3.0, "z": 2.0},
+            # Log that we're using ML-based pattern generation
+            logger.info(f"Using ML-based sensor pattern generation for {activity_type} activity in {position} position")
+        else:
+            # Use rule-based pattern generation (original approach)
+            if activity_type == "stationary":
+                # Already the default
+                pass
+            elif activity_type == "walking":
+                # Increase accelerometer and gyroscope variance
+                if "accelerometer" in profile["sensors"]:
+                    for axis in ["x", "y", "z"]:
+                        profile["sensors"]["accelerometer"]["variance"][axis] *= 3
+                if "gyroscope" in profile["sensors"]:
+                    for axis in ["x", "y", "z"]:
+                        profile["sensors"]["gyroscope"]["variance"][axis] *= 2.5
+                        
+                # Add walking pattern
+                profile["simulation_parameters"]["patterns"] = {
+                    "accelerometer": {
+                        "type": "sine",
+                        "amplitude": {"x": 0.8, "y": 1.2, "z": 1.5},
+                        "frequency": {"x": 1.8, "y": 1.8, "z": 1.8},
+                        "phase": {"x": 0, "y": math.pi/2, "z": math.pi/4},
+                    }
                 }
-            }
+            elif activity_type == "running":
+                # Significantly increase accelerometer and gyroscope variance
+                if "accelerometer" in profile["sensors"]:
+                    for axis in ["x", "y", "z"]:
+                        profile["sensors"]["accelerometer"]["variance"][axis] *= 6
+                if "gyroscope" in profile["sensors"]:
+                    for axis in ["x", "y", "z"]:
+                        profile["sensors"]["gyroscope"]["variance"][axis] *= 5
+                        
+                # Add running pattern (faster than walking)
+                profile["simulation_parameters"]["patterns"] = {
+                    "accelerometer": {
+                        "type": "sine",
+                        "amplitude": {"x": 1.5, "y": 2.5, "z": 3.0},
+                        "frequency": {"x": 3.0, "y": 3.0, "z": 3.0},
+                        "phase": {"x": 0, "y": math.pi/2, "z": math.pi/4},
+                    }
+                }
+            elif activity_type == "driving":
+                # Moderate increase in variance with occasional larger movements
+                if "accelerometer" in profile["sensors"]:
+                    for axis in ["x", "y", "z"]:
+                        profile["sensors"]["accelerometer"]["variance"][axis] *= 2
+                if "gyroscope" in profile["sensors"]:
+                    for axis in ["x", "y", "z"]:
+                        profile["sensors"]["gyroscope"]["variance"][axis] *= 1.5
+                
+                # Add driving pattern (mix of smooth and occasional jolts)
+                profile["simulation_parameters"]["patterns"] = {
+                    "accelerometer": {
+                        "type": "mixed",
+                        "smooth": {
+                            "amplitude": {"x": 0.3, "y": 0.3, "z": 0.2},
+                            "frequency": {"x": 0.5, "y": 0.5, "z": 0.5},
+                        },
+                        "jolt_probability": 0.01,  # 1% chance of jolt per update
+                        "jolt_magnitude": {"x": 3.0, "y": 3.0, "z": 2.0},
+                    }
+                }
+            
+            # Adjust based on position
+            if position != "flat":
+                # Modify the patterns based on device position
+                if "patterns" in profile["simulation_parameters"] and "accelerometer" in profile["simulation_parameters"]["patterns"]:
+                    # Adjust pattern phases and amplitudes based on position
+                    if position == "tilted":
+                        # Tilted position (e.g., ~45 degrees)
+                        if profile["simulation_parameters"]["patterns"]["accelerometer"]["type"] == "sine":
+                            # Modify sine wave pattern for tilted position
+                            profile["simulation_parameters"]["patterns"]["accelerometer"]["amplitude"]["x"] *= 1.5
+                            profile["simulation_parameters"]["patterns"]["accelerometer"]["amplitude"]["y"] *= 0.8
+                    elif position == "vertical":
+                        # Vertical position (upright)
+                        if profile["simulation_parameters"]["patterns"]["accelerometer"]["type"] == "sine":
+                            # For vertical position, most movement is in X and Y, less in Z
+                            profile["simulation_parameters"]["patterns"]["accelerometer"]["amplitude"]["z"] *= 0.5
+                            profile["simulation_parameters"]["patterns"]["accelerometer"]["amplitude"]["x"] *= 1.2
+                            profile["simulation_parameters"]["patterns"]["accelerometer"]["amplitude"]["y"] *= 1.2
+                    elif position == "upside_down":
+                        # Upside down (inverted)
+                        if profile["simulation_parameters"]["patterns"]["accelerometer"]["type"] == "sine":
+                            # Invert Z axis for upside down
+                            profile["simulation_parameters"]["patterns"]["accelerometer"]["amplitude"]["z"] *= -1
     
     def start_simulation(self):
         """Start the sensor data simulation."""
@@ -534,6 +627,34 @@ class SensorSimulator:
     
     def _calculate_pattern_values(self, sensor_name, time_value):
         """Calculate pattern-based values for sensors."""
+        # Use ML generator if available and enabled
+        if self.use_ml_generation and self.ml_generator is not None and sensor_name in ["accelerometer", "gyroscope", "magnetometer"]:
+            try:
+                # Get activity and position from profile
+                activity_type = self.current_profile.get("activity_type", "stationary")
+                position = self.current_profile.get("position", "flat")
+                
+                # Generate a single pattern value at the current time using ML
+                pattern_values = self.ml_generator.generate_sensor_patterns(
+                    sensor_name, 
+                    activity_type, 
+                    position, 
+                    duration=0.1,  # Just need a single value
+                    frequency=10   # Low frequency since we only need one value
+                )
+                
+                if pattern_values and len(pattern_values) > 0:
+                    # Extract values from the first sample
+                    result = {
+                        "x": pattern_values[0]["x"],
+                        "y": pattern_values[0]["y"],
+                        "z": pattern_values[0]["z"]
+                    }
+                    return result
+            except Exception as e:
+                logger.warning(f"Error using ML sensor generator: {e}. Falling back to rule-based generation.")
+        
+        # Fall back to rule-based patterns if ML is not available
         patterns = self.current_profile["simulation_parameters"].get("patterns", {})
         
         if sensor_name not in patterns:
@@ -603,6 +724,32 @@ class SensorSimulator:
                 
             return result
             
+        elif pattern_type == "ml_generated":
+            # Use ML generator directly from pattern config
+            if self.use_ml_generation and self.ml_generator is not None:
+                try:
+                    activity_type = pattern_config.get("activity", "stationary")
+                    position = pattern_config.get("position", "flat")
+                    
+                    pattern_values = self.ml_generator.generate_sensor_patterns(
+                        sensor_name, 
+                        activity_type, 
+                        position, 
+                        duration=0.1,
+                        frequency=10
+                    )
+                    
+                    if pattern_values and len(pattern_values) > 0:
+                        # Extract values from the first sample
+                        result = {
+                            "x": pattern_values[0]["x"],
+                            "y": pattern_values[0]["y"],
+                            "z": pattern_values[0]["z"]
+                        }
+                        return result
+                except Exception as e:
+                    logger.warning(f"Error using ML pattern generation: {e}")
+                    
         return None
         
     def get_current_values(self):
@@ -624,6 +771,114 @@ class SensorSimulator:
         # 3. Configure the system to use our simulated values
         
         return True
+        
+    def contribute_sensor_data(self, sensor_type, activity_type, position, data_points):
+        """
+        Contribute user-collected sensor data to improve ML models.
+        
+        Args:
+            sensor_type: Type of sensor ('accelerometer', 'gyroscope', 'magnetometer')
+            activity_type: Activity being performed ('stationary', 'walking', 'running', 'driving')
+            position: Device position ('flat', 'tilted', 'vertical', 'upside_down')
+            data_points: List of sensor reading dictionaries with 'x', 'y', 'z' values
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.use_ml_generation or not self.ml_generator:
+            logger.warning("ML sensor generation is not available. Cannot contribute data.")
+            return False
+            
+        if sensor_type not in ["accelerometer", "gyroscope", "magnetometer"]:
+            logger.error(f"Invalid sensor type: {sensor_type}")
+            return False
+            
+        try:
+            # Activities and positions for feature encoding
+            activities = ["stationary", "walking", "running", "driving"]
+            positions = ["flat", "tilted", "vertical", "upside_down"]
+            
+            # Check if the requested activity and position are known
+            if activity_type not in activities:
+                logger.warning(f"Unknown activity: {activity_type}. Using 'stationary'.")
+                activity_type = "stationary"
+                
+            if position not in positions:
+                logger.warning(f"Unknown position: {position}. Using 'flat'.")
+                position = "flat"
+            
+            # Normalized activity and position IDs
+            activity_id = activities.index(activity_type) / len(activities)
+            position_id = positions.index(position) / len(positions)
+            
+            # Process the data points to create features and targets
+            features = []
+            targets = []
+            
+            prev_values = [0, 0, 0]  # Initialize previous values
+            
+            for i, point in enumerate(data_points):
+                # Normalized time (0-1 over the sequence)
+                normalized_time = i / max(1, len(data_points) - 1)
+                
+                # Create feature vector: [time, activity, position, prev_x, prev_y, prev_z]
+                feature = [
+                    normalized_time,
+                    activity_id,
+                    position_id,
+                    prev_values[0],
+                    prev_values[1],
+                    prev_values[2]
+                ]
+                
+                # Target is the current x, y, z values
+                target = [point["x"], point["y"], point["z"]]
+                
+                features.append(feature)
+                targets.append(target)
+                
+                # Update previous values for next point
+                prev_values = target
+                
+            # Add the data to the ML model
+            success = self.ml_generator.add_training_data(sensor_type, features, targets)
+            
+            if success:
+                # Retrain the model with the new data
+                self.ml_generator.train_models()
+                logger.info(f"Successfully added {len(data_points)} points of {sensor_type} data for {activity_type} activity")
+            
+            return success
+        except Exception as e:
+            logger.error(f"Error contributing sensor data: {e}")
+            return False
+            
+    def get_ml_model_info(self):
+        """Get information about the ML models used for sensor simulation."""
+        if not self.use_ml_generation or not self.ml_generator:
+            return {
+                "available": False,
+                "reason": "ML sensor generation is not enabled or available"
+            }
+            
+        try:
+            # Get model info from ML generator
+            model_info = self.ml_generator.get_model_info()
+            
+            # Add some additional information
+            return {
+                "available": True,
+                "models": model_info,
+                "enabled": self.use_ml_generation,
+                "can_contribute": True
+            }
+        except Exception as e:
+            logger.error(f"Error getting ML model info: {e}")
+            return {
+                "available": True,
+                "enabled": self.use_ml_generation,
+                "error": str(e)
+            }
 
 
 if __name__ == "__main__":
