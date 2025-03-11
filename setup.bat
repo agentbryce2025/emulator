@@ -25,8 +25,8 @@ call venv\Scripts\activate.bat
 
 REM Install Python dependencies
 echo Installing Python dependencies...
-pip install --upgrade pip
-pip install -e .
+python -m pip install --upgrade pip
+python -m pip install -e .
 
 REM Note about QEMU
 echo.
