@@ -17,7 +17,7 @@ try:
         QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
         QLabel, QComboBox, QTabWidget, QGroupBox, QFormLayout, QLineEdit,
         QCheckBox, QFileDialog, QMessageBox, QSlider, QTextEdit, QSplitter,
-        QListWidget, QProgressBar, QSpinBox, QInputDialog
+        QListWidget, QListWidgetItem, QProgressBar, QSpinBox, QInputDialog
     )
     from PyQt5.QtCore import Qt, QTimer, pyqtSignal
     from PyQt5.QtGui import QIcon, QPixmap
@@ -28,7 +28,7 @@ except ImportError:
             QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QHBoxLayout,
             QLabel, QComboBox, QTabWidget, QGroupBox, QFormLayout, QLineEdit,
             QCheckBox, QFileDialog, QMessageBox, QSlider, QTextEdit, QSplitter,
-            QListWidget, QProgressBar, QSpinBox, QInputDialog
+            QListWidget, QListWidgetItem, QProgressBar, QSpinBox, QInputDialog
         )
         from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal
         from PySide6.QtGui import QIcon, QPixmap
