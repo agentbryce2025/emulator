@@ -26,7 +26,7 @@ try:
     from anti_detection.sensor_simulator import SensorSimulator
     from anti_detection.frida_manager import FridaManager
     from anti_detection.device_profiles import DeviceProfileDatabase
-    from test.linkedin_detection_test import LinkedInDetectionTest
+    from .linkedin_detection_test import LinkedInDetectionTest
 except ImportError as e:
     print(f"Error importing modules: {e}")
     print("Make sure you're running this script from the project root directory.")

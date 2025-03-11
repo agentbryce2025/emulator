@@ -12,8 +12,14 @@ from datetime import datetime
 
 # Import the automated test framework
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from src.test.automated_detection_test import AutomatedDetectionTest
-from src.anti_detection.device_profiles import DeviceProfileDatabase
+try:
+    from src.test.automated_detection_test import AutomatedDetectionTest
+    from src.anti_detection.device_profiles import DeviceProfileDatabase
+except ImportError:
+    # Try with relative import
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from src.test.automated_detection_test import AutomatedDetectionTest
+    from src.anti_detection.device_profiles import DeviceProfileDatabase
 
 def setup_logging():
     """Set up logging configuration."""
@@ -86,14 +92,16 @@ def main():
     # Handle --list-profiles flag
     if args.list_profiles:
         profile_db = DeviceProfileDatabase()
-        profiles = profile_db.get_profile_names()
+        
+        # Get default profile names from the class directly
+        default_profiles = list(DeviceProfileDatabase.DEFAULT_PROFILES.keys())
         
         print("\nAvailable Device Profiles:")
         print("=========================")
-        for i, profile in enumerate(profiles):
+        for i, profile in enumerate(default_profiles):
             print(f"{i+1}. {profile}")
         print()
-        return 0
+        sys.exit(0)  # Exit immediately after printing profiles
     
     # Create output directory
     output_dir = args.output_dir
