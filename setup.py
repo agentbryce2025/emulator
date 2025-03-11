@@ -11,7 +11,6 @@ setup(
     install_requires=[
         "PyQt5",
         "pyside6",
-        "qemu-python",
         "frida",
         "pycdlib",
         "pillow",

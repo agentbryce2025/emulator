@@ -360,10 +360,17 @@ class SensorSimulator:
                         for sensor, data in self.current_profile["sensors"].items()}
         
         pattern_time = 0.0
+        last_significant_change = time.time()
+        environment_state = self._generate_environment_state()
         
         while self.simulation_active:
             start_time = time.time()
             
+            # Occasionally change environment state for more realistic sensor patterns
+            if time.time() - last_significant_change > random.uniform(5, 30):
+                environment_state = self._generate_environment_state()
+                last_significant_change = time.time()
+                
             # Update each sensor
             for sensor_name, sensor_config in self.current_profile["sensors"].items():
                 if not sensor_config.get("enabled", False):
@@ -374,6 +381,9 @@ class SensorSimulator:
                 
                 # Apply pattern if defined
                 pattern_values = self._calculate_pattern_values(sensor_name, pattern_time)
+                
+                # Apply environmental factors
+                environmental_values = self._apply_environment_factors(sensor_name, environment_state)
                 
                 # Apply drift
                 if self.current_profile["simulation_parameters"].get("drift_enabled", False):
@@ -404,6 +414,123 @@ class SensorSimulator:
             elapsed = time.time() - start_time
             if elapsed < update_interval:
                 time.sleep(update_interval - elapsed)
+    
+    def _generate_environment_state(self):
+        """Generate a random environmental state for realistic sensor changes."""
+        return {
+            "lighting": random.choice(["dark", "dim", "normal", "bright", "very_bright"]),
+            "movement": random.choice(["none", "slight", "moderate", "significant"]),
+            "position": random.choice(["flat", "tilted", "vertical", "upside_down"]),
+            "temperature": random.uniform(15, 35),  # Celsius
+            "pressure": random.uniform(980, 1030),  # hPa
+            "humidity": random.uniform(20, 80),     # %
+            "magnetic_interference": random.uniform(0, 1),  # Normalized interference level
+        }
+        
+    def _apply_environment_factors(self, sensor_name, environment):
+        """Apply environmental factors to sensor values."""
+        result = {}
+        
+        if sensor_name == "accelerometer":
+            # Adjust accelerometer based on position
+            if environment["position"] == "flat":
+                result = {"x": random.uniform(-0.1, 0.1), "y": random.uniform(-0.1, 0.1), "z": 9.81}
+            elif environment["position"] == "tilted":
+                tilt_angle = random.uniform(0, 45) * (math.pi / 180)  # Convert to radians
+                tilt_direction = random.uniform(0, 2 * math.pi)
+                result = {
+                    "x": 9.81 * math.sin(tilt_angle) * math.cos(tilt_direction),
+                    "y": 9.81 * math.sin(tilt_angle) * math.sin(tilt_direction),
+                    "z": 9.81 * math.cos(tilt_angle)
+                }
+            elif environment["position"] == "vertical":
+                vertical_angle = random.uniform(80, 100) * (math.pi / 180)
+                direction = random.uniform(0, 2 * math.pi)
+                result = {
+                    "x": 9.81 * math.sin(vertical_angle) * math.cos(direction),
+                    "y": 9.81 * math.sin(vertical_angle) * math.sin(direction),
+                    "z": 9.81 * math.cos(vertical_angle)
+                }
+            elif environment["position"] == "upside_down":
+                result = {"x": random.uniform(-0.1, 0.1), "y": random.uniform(-0.1, 0.1), "z": -9.81}
+            
+            # Add movement effects
+            if environment["movement"] == "slight":
+                for axis in ["x", "y", "z"]:
+                    result[axis] = result.get(axis, 0) + random.uniform(-0.2, 0.2)
+            elif environment["movement"] == "moderate":
+                for axis in ["x", "y", "z"]:
+                    result[axis] = result.get(axis, 0) + random.uniform(-0.5, 0.5)
+            elif environment["movement"] == "significant":
+                for axis in ["x", "y", "z"]:
+                    result[axis] = result.get(axis, 0) + random.uniform(-1.0, 1.0)
+                    
+        elif sensor_name == "gyroscope":
+            # Base values based on movement
+            if environment["movement"] == "none":
+                result = {"x": 0, "y": 0, "z": 0}
+            elif environment["movement"] == "slight":
+                result = {
+                    "x": random.uniform(-0.1, 0.1),
+                    "y": random.uniform(-0.1, 0.1),
+                    "z": random.uniform(-0.1, 0.1)
+                }
+            elif environment["movement"] == "moderate":
+                result = {
+                    "x": random.uniform(-0.3, 0.3),
+                    "y": random.uniform(-0.3, 0.3),
+                    "z": random.uniform(-0.3, 0.3)
+                }
+            elif environment["movement"] == "significant":
+                result = {
+                    "x": random.uniform(-0.8, 0.8),
+                    "y": random.uniform(-0.8, 0.8),
+                    "z": random.uniform(-0.8, 0.8)
+                }
+                
+        elif sensor_name == "magnetometer":
+            # Base magnetic field (approximate Earth's field)
+            base_mag = {"x": 25.0, "y": 10.0, "z": 40.0}
+            
+            # Apply magnetic interference
+            interference = environment["magnetic_interference"]
+            result = {
+                "x": base_mag["x"] + interference * random.uniform(-10, 10),
+                "y": base_mag["y"] + interference * random.uniform(-10, 10),
+                "z": base_mag["z"] + interference * random.uniform(-10, 10)
+            }
+            
+        elif sensor_name == "light":
+            # Light values based on lighting condition
+            if environment["lighting"] == "dark":
+                result = {"lux": random.uniform(0, 10)}
+            elif environment["lighting"] == "dim":
+                result = {"lux": random.uniform(10, 100)}
+            elif environment["lighting"] == "normal":
+                result = {"lux": random.uniform(100, 500)}
+            elif environment["lighting"] == "bright":
+                result = {"lux": random.uniform(500, 2000)}
+            elif environment["lighting"] == "very_bright":
+                result = {"lux": random.uniform(2000, 10000)}
+                
+        elif sensor_name == "proximity":
+            # Proximity mostly binary: far or near
+            if environment["movement"] == "none" and random.random() > 0.9:
+                # Sometimes while stationary, something might be close (like user's face)
+                result = {"distance": random.uniform(0, 5)}
+            else:
+                result = {"distance": 100.0}  # Far
+                
+        elif sensor_name == "pressure":
+            result = {"hPa": environment["pressure"]}
+            
+        elif sensor_name == "temperature":
+            result = {"celsius": environment["temperature"]}
+            
+        elif sensor_name == "humidity":
+            result = {"percent": environment["humidity"]}
+            
+        return result
     
     def _calculate_pattern_values(self, sensor_name, time_value):
         """Calculate pattern-based values for sensors."""
@@ -448,6 +575,32 @@ class SensorSimulator:
                     if axis in jolt_magnitude:
                         result[axis] = result.get(axis, 0) + random.uniform(-jolt_magnitude[axis], jolt_magnitude[axis])
                         
+            return result
+        
+        elif pattern_type == "realistic":
+            # Realistic walking/running pattern
+            step_frequency = pattern_config.get("step_frequency", 1.8)  # Steps per second
+            step_intensity = pattern_config.get("step_intensity", 1.0)
+            
+            # Each step has impact and recovery phases
+            step_phase = (time_value * step_frequency) % 1.0
+            
+            # Simplified step impact model
+            if step_phase < 0.2:  # Impact phase
+                impact = math.sin(step_phase * math.pi / 0.2) * step_intensity
+                result = {
+                    "x": random.uniform(-0.2, 0.2) * impact,
+                    "y": random.uniform(-0.2, 0.2) * impact,
+                    "z": 9.81 + impact * 2.0  # Higher Z during impact
+                }
+            else:  # Recovery and flight phase
+                recovery = math.sin((step_phase - 0.2) * math.pi / 0.8) * 0.5 * step_intensity
+                result = {
+                    "x": random.uniform(-0.1, 0.1) * recovery,
+                    "y": random.uniform(-0.1, 0.1) * recovery,
+                    "z": 9.81 - recovery  # Lower Z during flight
+                }
+                
             return result
             
         return None
