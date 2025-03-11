@@ -31,9 +31,12 @@ if not os.path.exists(os.path.join(os.path.dirname(__file__), "src")):
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from src.core.qemu_wrapper import QEMUWrapper
+    from src.core.image_manager import ImageManager
+    from src.core.android_customizer import AndroidCustomizer
     from src.anti_detection.hardware_spoof import HardwareSpoofer
     from src.anti_detection.sensor_simulator import SensorSimulator
     from src.anti_detection.frida_manager import FridaManager
+    from src.anti_detection.device_profiles import DeviceProfileDatabase
     from src.gui.emulator_gui import EmulatorGUI, QApplication
 except ImportError as e:
     logger.error(f"Error importing modules: {str(e)}")
@@ -49,11 +52,14 @@ def parse_arguments():
     
     parser.add_argument("--no-gui", action="store_true", help="Run in headless mode (no GUI)")
     parser.add_argument("--system-image", help="Path to Android system image")
-    parser.add_argument("--hardware-profile", help="Hardware profile to use")
-    parser.add_argument("--sensor-profile", help="Sensor profile to use")
+    parser.add_argument("--data-image", help="Path to data image (for persistent storage)")
+    parser.add_argument("--device-profile", help="Device profile to use")
     parser.add_argument("--memory", default="2048", help="Memory size in MB")
     parser.add_argument("--cores", default="4", help="Number of CPU cores")
     parser.add_argument("--auto-start", action="store_true", help="Start emulator automatically")
+    parser.add_argument("--target-app", help="Target app package name (e.g., com.linkedin.android)")
+    parser.add_argument("--frida-script", help="Path to custom Frida script to use")
+    parser.add_argument("--linkedin-mode", action="store_true", help="Enable LinkedIn-specific detection bypass")
     
     return parser.parse_args()
 
@@ -63,40 +69,109 @@ def run_headless(args):
     
     # Initialize components
     qemu = QEMUWrapper()
-    hardware_spoofer = HardwareSpoofer()
-    sensor_simulator = SensorSimulator()
+    image_manager = ImageManager()
+    android_customizer = AndroidCustomizer()
+    
+    # Get device profile
+    profile_db = DeviceProfileDatabase()
+    device_profile = None
+    
+    if args.device_profile:
+        device_profile = profile_db.get_profile(args.device_profile)
+        if not device_profile:
+            logger.error(f"Device profile '{args.device_profile}' not found")
+            logger.info(f"Available profiles: {', '.join(profile_db.get_profile_names())}")
+            return 1
+    else:
+        # Use a random profile
+        device_profile = profile_db.get_random_profile()
+        if not device_profile:
+            logger.error("No device profiles available")
+            return 1
+            
+    logger.info(f"Using device profile: {device_profile['manufacturer']} {device_profile['model']}")
     
     # Configure QEMU
     qemu.set_param("memory", args.memory)
     qemu.set_param("smp", args.cores)
     qemu.set_param("display", "none")  # Headless mode
     
+    # Set up Android image
     if args.system_image:
-        qemu.set_param("hda", args.system_image)
-    else:
-        logger.error("No system image specified. Use --system-image to provide one.")
-        return 1
-        
-    # Load hardware profile if specified
-    if args.hardware_profile:
-        if hardware_spoofer.load_profile(args.hardware_profile):
-            logger.info(f"Loaded hardware profile: {args.hardware_profile}")
-        else:
-            logger.error(f"Failed to load hardware profile: {args.hardware_profile}")
+        system_image = args.system_image
+        if not os.path.exists(system_image):
+            logger.error(f"System image not found: {system_image}")
             return 1
     else:
-        # Create a default profile
-        hardware_spoofer.create_new_profile("Samsung", "Galaxy S21", "12.0")
-        logger.info("Created default hardware profile")
-        
-    # Load sensor profile if specified
-    if args.sensor_profile:
-        if sensor_simulator.load_profile(args.sensor_profile):
-            logger.info(f"Loaded sensor profile: {args.sensor_profile}")
-        else:
-            logger.error(f"Failed to load sensor profile: {args.sensor_profile}")
+        # Try to find an image
+        available_images = image_manager.get_available_images()
+        if not available_images:
+            logger.error("No system images available. Please specify --system-image or download one.")
             return 1
             
+        # Use the first available image
+        system_image = available_images[0]['path']
+        logger.info(f"Using system image: {system_image}")
+    
+    qemu.set_param("cdrom", system_image)
+    
+    # Set up data image if provided
+    if args.data_image:
+        if not os.path.exists(args.data_image):
+            logger.error(f"Data image not found: {args.data_image}")
+            return 1
+            
+        qemu.set_param("hda", args.data_image)
+    else:
+        # Create a temporary data image
+        temp_data = image_manager.create_empty_image("temp_data", size_gb=8)
+        if temp_data:
+            qemu.set_param("hda", temp_data)
+            logger.info(f"Created temporary data image: {temp_data}")
+        else:
+            logger.warning("Failed to create temporary data image, proceeding without persistent storage")
+    
+    # Initialize sensor simulator with device profile
+    sensor_simulator = SensorSimulator()
+    if "sensors" in device_profile:
+        sensor_profile = {
+            "sensors": device_profile["sensors"],
+            "device": {
+                "manufacturer": device_profile["manufacturer"],
+                "model": device_profile["model"]
+            }
+        }
+        sensor_simulator.set_profile(sensor_profile)
+        logger.info("Set up sensor simulation from device profile")
+    
+    # Initialize Frida manager
+    frida_manager = FridaManager()
+    
+    # Set up Frida script
+    if args.linkedin_mode:
+        frida_script_path = os.path.join(os.path.dirname(__file__), 
+                                        "src", "anti_detection", "frida_scripts", "linkedin_bypass.js")
+        frida_manager.load_script(frida_script_path)
+        logger.info("Loaded LinkedIn-specific Frida script")
+    elif args.frida_script:
+        if not os.path.exists(args.frida_script):
+            logger.error(f"Frida script not found: {args.frida_script}")
+            return 1
+            
+        frida_manager.load_script(args.frida_script)
+        logger.info(f"Loaded custom Frida script: {args.frida_script}")
+    else:
+        # Load default script
+        default_script = os.path.join(os.path.dirname(__file__), 
+                                    "src", "anti_detection", "frida_scripts", "detection_bypass.js")
+        frida_manager.load_script(default_script)
+        logger.info("Loaded default Frida detection bypass script")
+    
+    # Set target app if specified
+    if args.target_app:
+        frida_manager.set_target_package(args.target_app)
+        logger.info(f"Set target package: {args.target_app}")
+    
     # Start the emulator
     if qemu.start():
         logger.info("Emulator started successfully")
@@ -105,6 +180,10 @@ def run_headless(args):
         if sensor_simulator.current_profile:
             if sensor_simulator.start_simulation():
                 logger.info("Sensor simulation started")
+        
+        # Start Frida manager to inject scripts when target app launches
+        frida_manager.start_monitoring()
+        logger.info("Frida manager started")
                 
         # Keep running until terminated
         try:
@@ -115,8 +194,12 @@ def run_headless(args):
             logger.info("Received shutdown signal")
         finally:
             # Cleanup
+            frida_manager.stop_monitoring()
+            logger.info("Stopped Frida monitoring")
+            
             if sensor_simulator.sensor_simulation_active:
                 sensor_simulator.stop_simulation()
+                logger.info("Stopped sensor simulation")
                 
             qemu.stop()
             logger.info("Emulator stopped")
@@ -141,6 +224,16 @@ def main():
     args = parse_arguments()
     
     logger.info("Undetected Android Emulator starting")
+    
+    # Check for required tools
+    try:
+        import subprocess
+        result = subprocess.run(["qemu-system-x86_64", "--version"], 
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            logger.warning("QEMU not found in PATH. Make sure QEMU is installed.")
+    except FileNotFoundError:
+        logger.warning("QEMU not found. Please install QEMU to run the emulator.")
     
     try:
         if args.no_gui:
