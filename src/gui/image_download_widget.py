@@ -34,7 +34,8 @@ class ImageDownloadWidget(QWidget):
     """Widget for downloading and managing Android-x86 images."""
     
     # Signal emitted when a new image is downloaded or selected
-    image_selected = pyqtSignal(str)
+    # Signal emitting the image info dictionary
+    image_selected = pyqtSignal(object)
     
     def __init__(self, parent=None):
         """Initialize the image download widget."""
