@@ -1,0 +1,30 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="undetected-android-emulator",
+    version="0.1.0",
+    description="Undetectable Android Emulator with GUI",
+    author="agentbryce2025",
+    author_email="example@example.com",
+    url="https://github.com/agentbryce2025/emulator",
+    packages=find_packages(),
+    install_requires=[
+        "PyQt5",
+        "pyside6",
+        "qemu-python",
+        "frida",
+        "pycdlib",
+        "pillow",
+        "numpy",
+        "requests",
+    ],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+    ],
+    python_requires=">=3.8",
+)
