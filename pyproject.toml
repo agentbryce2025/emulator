@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "undetected-android-emulator"
+version = "0.2.0"
+description = "Undetectable Android Emulator with GUI"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+authors = [
+    {name = "agentbryce2025", email = "example@example.com"}
+]
+dependencies = [
+    "PyQt5",
+    "pyside6",
+    "frida",
+    "pycdlib",
+    "pillow",
+    "numpy",
+    "requests",
+    "psutil",
+    "aiohttp",
+    "python-magic",
+    "python-xlib; platform_system=='Linux'",
+    "pycryptodomex",
+    "scikit-learn",
+    "joblib",
+    "matplotlib",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/agentbryce2025/emulator"
+"Bug Tracker" = "https://github.com/agentbryce2025/emulator/issues"
+
+[project.scripts]
+undetected-emulator = "main:main"

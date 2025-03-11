@@ -2,6 +2,72 @@
 
 This project aims to create an Android phone emulator that is undetectable by LinkedIn and other applications while providing a fully functional visual GUI experience.
 
+## Quick Setup Guide
+
+### Prerequisites
+- Python 3.8 or higher
+- QEMU 6.0+ (see platform-specific instructions below)
+
+### Simple Installation (All Platforms)
+
+1. Run the Python setup script:
+   ```bash
+   # On all platforms
+   python install_requirements.py
+   ```
+
+2. Activate the virtual environment:
+   ```bash
+   # On Windows
+   venv\Scripts\activate
+
+   # On macOS/Linux
+   source venv/bin/activate
+   ```
+
+3. Run the emulator:
+   ```bash
+   python main.py
+   ```
+
+### Alternative Platform-Specific Installation
+
+#### Windows
+1. Download and install [QEMU for Windows](https://www.qemu.org/download/#windows)
+2. Run the setup script:
+   ```
+   setup.bat
+   ```
+
+#### macOS
+1. Install dependencies:
+   ```bash
+   # Using Homebrew
+   brew install python qemu libmagic
+   ```
+2. Run the setup script:
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
+
+#### Linux (Ubuntu/Debian)
+1. Install dependencies:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install python3-pip python3-venv qemu-system-x86 qemu-utils libmagic1
+   ```
+2. Run the setup script:
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
+
+### Command-line Options
+```
+python main.py --help
+```
+
 ## Project Goals
 
 1. Create a fully functional Android emulator with a visual GUI
