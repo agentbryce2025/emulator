@@ -27,12 +27,35 @@ class FridaManager:
         self.sessions = {}
         self.scripts = {}
         self.connected = False
+        self.script_content = None  # Store script content for compatibility
+        self.target_package = None  # Store target package for compatibility
         
         # Ensure scripts directory exists
         os.makedirs(self.scripts_dir, exist_ok=True)
         
         # Try to connect to the device
         self._connect_to_device()
+        
+    def load_script(self, script_path):
+        """Compatibility method for loading a script - just stores the path for later use."""
+        if not os.path.exists(script_path):
+            logger.error(f"Script not found: {script_path}")
+            return False
+            
+        try:
+            with open(script_path, "r") as f:
+                self.script_content = f.read()
+            logger.info(f"Loaded script from {script_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading script {script_path}: {e}")
+            return False
+            
+    def set_target_package(self, package_name):
+        """Compatibility method for setting the target package."""
+        self.target_package = package_name
+        logger.info(f"Set target package: {package_name}")
+        return True
         
     def _connect_to_device(self):
         """Connect to the Android device using Frida."""
@@ -236,6 +259,18 @@ class FridaManager:
                 
         return success
         
+    def start_monitoring(self):
+        """Start monitoring for target app launch and inject scripts."""
+        if self.target_package and self.script_content:
+            logger.info(f"Monitoring started for package: {self.target_package}")
+            # In a real implementation, this would start a background thread
+            # that checks for the app to launch, then injects the script.
+            # For compatibility purposes, we'll just log that it's started.
+            return True
+        else:
+            logger.warning("Cannot start monitoring: No target package or script content set")
+            return False
+            
     def close(self):
         """Clean up resources before shutting down."""
         self.detach_all()

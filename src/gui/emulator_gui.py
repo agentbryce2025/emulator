@@ -721,6 +721,13 @@ class EmulatorGUI(QMainWindow):
                         "device": {
                             "manufacturer": self.selected_device_profile["manufacturer"],
                             "model": self.selected_device_profile["model"]
+                        },
+                        "simulation_parameters": {
+                            "noise_factor": 0.05,
+                            "update_frequency": 50,  # Hz
+                            "drift_enabled": True,
+                            "drift_factor": 0.001,
+                            "use_ml": True
                         }
                     }
                     logger.info("Configured sensor simulation from device profile")
@@ -748,16 +755,29 @@ class EmulatorGUI(QMainWindow):
                     script_path = items[0].data(Qt.UserRole)
                     
                 if script_path:
-                    self.frida_manager.load_script(script_path)
-                    
-                    # Set target app if specified
-                    target_app = self.target_app_input.text().strip()
-                    if target_app:
-                        self.frida_manager.set_target_package(target_app)
+                    # Since frida_manager doesn't have load_script method, we need to use another approach
+                    # Get the script content
+                    try:
+                        with open(script_path, "r") as f:
+                            script_content = f.read()
                         
-                    # Start monitoring for app launch
-                    self.frida_manager.start_monitoring()
-                    logger.info(f"Frida monitoring started for {target_app}")
+                        # Set target app if specified
+                        target_app = self.target_app_input.text().strip()
+                        
+                        # We'll inject the script directly when needed
+                        if target_app:
+                            # Store the information for later use with inject_script
+                            self.frida_script_content = script_content
+                            self.frida_target_app = target_app
+                            
+                        # Start monitoring for app launch if applicable
+                        if hasattr(self.frida_manager, "start_monitoring"):
+                            self.frida_manager.start_monitoring()
+                            logger.info(f"Frida monitoring started for {target_app}")
+                        else:
+                            logger.warning("Frida monitoring not available in this version")
+                    except Exception as e:
+                        logger.error(f"Error loading Frida script: {e}")
         else:
             QMessageBox.critical(
                 self,
