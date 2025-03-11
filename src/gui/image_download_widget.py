@@ -13,7 +13,7 @@ try:
     from PyQt5.QtWidgets import (
         QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, 
         QProgressBar, QListWidget, QListWidgetItem, QMessageBox, QFileDialog,
-        QGroupBox, QFormLayout, QSpinBox
+        QGroupBox, QFormLayout, QSpinBox, QApplication, QInputDialog
     )
     from PyQt5.QtCore import Qt, QTimer, pyqtSignal
     from PyQt5.QtGui import QIcon
@@ -21,7 +21,7 @@ except ImportError:
     from PySide6.QtWidgets import (
         QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, 
         QProgressBar, QListWidget, QListWidgetItem, QMessageBox, QFileDialog,
-        QGroupBox, QFormLayout, QSpinBox
+        QGroupBox, QFormLayout, QSpinBox, QApplication, QInputDialog
     )
     from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal
     from PySide6.QtGui import QIcon
@@ -101,14 +101,29 @@ class ImageDownloadWidget(QWidget):
         download_button = QPushButton("Download")
         download_button.clicked.connect(self.download_image)
         
+        use_local_button = QPushButton("Use Local File")
+        use_local_button.clicked.connect(self.import_image)
+        use_local_button.setToolTip("Select a locally downloaded Android-x86 ISO file")
+        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.cancel_download)
         self.cancel_button.setVisible(False)
         
         buttons_layout = QHBoxLayout()
         buttons_layout.addWidget(download_button)
+        buttons_layout.addWidget(use_local_button)
         buttons_layout.addWidget(self.cancel_button)
         download_layout.addLayout(buttons_layout)
+        
+        # Add direct download link info
+        download_help = QLabel(
+            "<small>Having trouble with downloads? " 
+            "<a href='https://www.android-x86.org/download.html'>Download directly</a> "
+            "and use the 'Use Local File' button</small>"
+        )
+        download_help.setOpenExternalLinks(True)
+        download_help.setWordWrap(True)
+        download_layout.addWidget(download_help)
         
         # Create data image group
         data_image_group = QGroupBox("Create Data Image")
@@ -253,50 +268,137 @@ class ImageDownloadWidget(QWidget):
                     
     def import_image(self):
         """Import an existing Android-x86 image."""
+        # Default to Downloads directory if it exists, otherwise home directory
+        default_dir = str(Path.home() / "Downloads")
+        if not os.path.exists(default_dir):
+            default_dir = str(Path.home())
+            
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Import Android-x86 Image",
-            str(Path.home()),
+            "Select Android-x86 ISO Image",
+            default_dir,
             "ISO Images (*.iso);;All Files (*)"
         )
         
-        if file_path:
-            # Copy the file to the image directory
-            import shutil
-            try:
-                filename = os.path.basename(file_path)
-                target_path = os.path.join(self.image_manager.storage_dir, filename)
-                
-                # Check if the file already exists
-                if os.path.exists(target_path):
-                    reply = QMessageBox.question(
-                        self,
-                        "File Already Exists",
-                        f"A file with the name {filename} already exists. Overwrite?",
-                        QMessageBox.Yes | QMessageBox.No,
-                        QMessageBox.No
-                    )
+        if not file_path:
+            return  # User cancelled
+            
+        import shutil
+        
+        # Get the destination directory and filename
+        target_basename = os.path.basename(file_path)
+        
+        # If the filename doesn't look like an Android-x86 image, suggest renaming it
+        if not target_basename.startswith("android-x86"):
+            # Guess the version from the file name if possible
+            version = None
+            for v in self.image_manager.AVAILABLE_VERSIONS:
+                if v in file_path:
+                    version = v
+                    break
                     
-                    if reply == QMessageBox.No:
-                        return
+            if not version:
+                version = "9.0-r2"  # Default to latest version
                 
+            # Guess architecture
+            arch = "x86_64" if "64" in file_path else "x86"
+            
+            # Suggest new filename
+            suggested_name = f"android-x86_{version}_{arch}.iso"
+            
+            # Ask user if they want to rename it
+            rename_msg = (
+                f"The selected file '{target_basename}' doesn't follow the Android-x86 naming convention.\n\n"
+                f"For better compatibility, would you like to rename it to '{suggested_name}'?"
+            )
+            
+            rename = QMessageBox.question(
+                self,
+                "Rename File?",
+                rename_msg,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            
+            if rename == QMessageBox.Yes:
+                target_basename = suggested_name
+        
+        try:
+            # Ensure the target directory exists
+            os.makedirs(self.image_manager.storage_dir, exist_ok=True)
+            
+            # Final target path
+            target_path = os.path.join(self.image_manager.storage_dir, target_basename)
+            
+            # Check if the file already exists
+            if os.path.exists(target_path):
+                confirm = QMessageBox.question(
+                    self,
+                    "File Exists",
+                    f"The file '{target_basename}' already exists in the image directory. Overwrite?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                
+                if confirm != QMessageBox.Yes:
+                    return
+            
+            # Show progress message
+            progress_msg = QMessageBox(self)
+            progress_msg.setWindowTitle("Importing Image")
+            progress_msg.setText(f"Copying {os.path.basename(file_path)}...\nThis may take a while for large files.")
+            progress_msg.setStandardButtons(QMessageBox.NoButton)
+            progress_msg.show()
+            
+            # Process events to update the UI
+            QApplication.processEvents()
+            
+            try:
+                # Copy the file
                 shutil.copy2(file_path, target_path)
+                
+                # Close progress message
+                progress_msg.close()
+                
+                QMessageBox.information(
+                    self,
+                    "Import Successful",
+                    f"Imported '{target_basename}' successfully."
+                )
+                
                 logger.info(f"Imported image from {file_path} to {target_path}")
                 
+                # Update the image list
                 self.update_image_list()
-            except Exception as e:
-                QMessageBox.warning(
-                    self,
-                    "Import Error",
-                    f"Failed to import the image: {str(e)}"
-                )
+                
+                # Select the imported image
+                for i in range(self.image_list.count()):
+                    item = self.image_list.item(i)
+                    image_info = item.data(Qt.UserRole)
+                    if image_info["path"] == target_path:
+                        self.image_list.setCurrentItem(item)
+                        self.image_selected.emit(image_info)
+                        break
+            finally:
+                # Close progress message if it's still open
+                try:
+                    progress_msg.close()
+                except:
+                    pass
+                    
+        except Exception as e:
+            logger.error(f"Failed to import image: {str(e)}")
+            QMessageBox.critical(
+                self,
+                "Import Error",
+                f"Failed to import the image:\n\n{str(e)}\n\nPlease make sure you have permissions to copy files and enough disk space."
+            )
                 
     def create_data_image(self):
         """Create a new data image file."""
         size_gb = self.data_size_spinner.value()
         
         # Ask for a name
-        from PyQt5.QtWidgets import QInputDialog
         name, ok = QInputDialog.getText(
             self,
             "Data Image Name",

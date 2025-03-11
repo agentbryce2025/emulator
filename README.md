@@ -73,12 +73,23 @@ python main.py --help
 #### Image Download Errors
 If you're experiencing timeouts or errors while downloading Android images:
 
-1. **Retry the download**: Downloads may fail due to temporary server issues
-2. **Use a different network**: Some networks may block or limit large downloads
-3. **Manual download**: You can manually download Android-x86 images from:
-   - [Android-x86 Project Website](https://www.android-x86.org/download.html)
-   - [SourceForge](https://sourceforge.net/projects/android-x86/files/)
-   - After downloading, place the ISO file in `~/.config/undetected-emulator/images/` (Linux/macOS) or `C:\Users\YOUR_USERNAME\.config\undetected-emulator\images\` (Windows)
+1. **Use the 'Use Local File' Button**: The emulator now has a button to use a locally downloaded ISO file
+2. **Manual Download Instructions**:
+   - Go to the [Android-x86 Project Website](https://www.android-x86.org/download.html)
+   - Download the appropriate ISO file (e.g., android-x86_64-9.0-r2.iso)
+   - Recommended: Android-x86 9.0-r2 for x86_64 architecture
+   - Once downloaded, click "Use Local File" in the emulator's Images tab
+   - Navigate to your download location and select the ISO file
+
+3. **Direct Download Links**:
+   - [Android-x86 9.0-r2 (64-bit)](https://sourceforge.net/projects/android-x86/files/Release%209.0/android-x86_64-9.0-r2.iso/download)
+   - [Android-x86 8.1-r6 (64-bit)](https://sourceforge.net/projects/android-x86/files/Release%208.1/android-x86_64-8.1-r6.iso/download)
+   - [Android-x86 7.1-r5 (64-bit)](https://sourceforge.net/projects/android-x86/files/Release%207.1/android-x86_64-7.1-r5.iso/download)
+
+4. **Advanced Manual Setup**: 
+   You can directly place the downloaded ISO files in the emulator's images directory:
+   - Windows: `C:\Users\YOUR_USERNAME\.config\undetected-emulator\images\`
+   - Linux/macOS: `~/.config/undetected-emulator/images/`
 
 #### QEMU Not Found Error
 If you see "QEMU not found" errors:
