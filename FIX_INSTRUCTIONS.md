@@ -13,6 +13,10 @@ The emulator is failing with the following errors:
    ```
 
 3. ```
+   KeyError: 'baseline'
+   ```
+
+4. ```
    AttributeError: 'FridaManager' object has no attribute 'load_script'
    ```
 
@@ -136,10 +140,102 @@ If you have Git installed:
 3. Run: `git apply fix_sensor_simulator.patch`
 4. Note that this only fixes the first issue. Run `fix_emulator.py` to fix all issues.
 
+#### Fix 3: SensorSimulator baseline KeyError
+
+1. Open the file `src/anti_detection/sensor_simulator.py`
+2. Find the `_simulation_loop` method (around line 448)
+3. Replace the code:
+
+```python
+        drift_values = {sensor: {axis: 0.0 for axis in data["baseline"].keys()} 
+                        for sensor, data in self.current_profile["sensors"].items()}
+```
+
+with:
+
+```python
+        # Initialize drift values with defensive code for profiles that might not have baseline defined
+        drift_values = {}
+        for sensor, data in self.current_profile["sensors"].items():
+            if "baseline" in data:
+                drift_values[sensor] = {axis: 0.0 for axis in data["baseline"].keys()}
+            elif sensor == "accelerometer":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "gyroscope":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "magnetometer":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "proximity":
+                drift_values[sensor] = {"distance": 0.0}
+            elif sensor == "light":
+                drift_values[sensor] = {"lux": 0.0}
+            elif sensor == "pressure":
+                drift_values[sensor] = {"hPa": 0.0}
+            elif sensor == "temperature":
+                drift_values[sensor] = {"celsius": 0.0}
+            elif sensor == "humidity":
+                drift_values[sensor] = {"percent": 0.0}
+            else:
+                # For unknown sensors, try to extract keys or use a default
+                try:
+                    drift_values[sensor] = {k: 0.0 for k in data.keys() if isinstance(k, str) and k != "enabled"}
+                except (AttributeError, TypeError):
+                    drift_values[sensor] = {"value": 0.0}
+```
+
+4. Find the sensor update code (around line 497)
+5. Replace the code:
+
+```python
+                baseline = sensor_config["baseline"]
+                variance = sensor_config["variance"]
+```
+
+with:
+
+```python
+                # Handle profiles that might not have baseline and variance fields
+                if "baseline" not in sensor_config or "variance" not in sensor_config:
+                    # Add default values based on sensor type
+                    if sensor_name == "accelerometer":
+                        baseline = {"x": 0.0, "y": 0.0, "z": 9.81}
+                        variance = {"x": 0.1, "y": 0.1, "z": 0.1}
+                    elif sensor_name == "gyroscope":
+                        baseline = {"x": 0.0, "y": 0.0, "z": 0.0}
+                        variance = {"x": 0.02, "y": 0.02, "z": 0.02}
+                    elif sensor_name == "magnetometer":
+                        baseline = {"x": 25.0, "y": 10.0, "z": 40.0}
+                        variance = {"x": 2.0, "y": 2.0, "z": 2.0}
+                    elif sensor_name == "proximity":
+                        baseline = {"distance": 100.0}
+                        variance = {"distance": 0.0}
+                    elif sensor_name == "light":
+                        baseline = {"lux": 500.0}
+                        variance = {"lux": 50.0}
+                    elif sensor_name == "pressure":
+                        baseline = {"hPa": 1013.25}
+                        variance = {"hPa": 0.5}
+                    elif sensor_name == "temperature":
+                        baseline = {"celsius": 22.0}
+                        variance = {"celsius": 0.5}
+                    elif sensor_name == "humidity":
+                        baseline = {"percent": 50.0}
+                        variance = {"percent": 1.0}
+                    else:
+                        # For unknown sensors, try to create reasonable defaults
+                        baseline = {"value": 0.0}
+                        variance = {"value": 0.1}
+                else:
+                    baseline = sensor_config["baseline"]
+                    variance = sensor_config["variance"]
+```
+
 ## What These Fixes Do
 
-1. **SensorSimulator Fix**: Replaces the call to the non-existent `set_profile()` method with code that creates a device profile and sets the `current_profile` property directly, including the required `simulation_parameters`.
+1. **SensorSimulator set_profile Fix**: Replaces the call to the non-existent `set_profile()` method with code that creates a device profile and sets the `current_profile` property directly, including the required `simulation_parameters`.
 
-2. **FridaManager Fix**: Adds compatibility methods to handle the calls to `load_script()`, `set_target_package()`, and `start_monitoring()` that are used in the GUI code.
+2. **SensorSimulator baseline Fix**: Adds defensive code to handle sensor profiles that don't have the expected `baseline` and `variance` fields, providing sensible defaults based on sensor type.
+
+3. **FridaManager Fix**: Adds compatibility methods to handle the calls to `load_script()`, `set_target_package()`, and `start_monitoring()` that are used in the GUI code.
 
 After applying these fixes, the emulator should now work correctly without those errors.

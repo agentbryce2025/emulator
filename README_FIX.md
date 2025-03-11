@@ -13,6 +13,10 @@ The emulator is failing with multiple errors:
    ```
 
 3. ```
+   KeyError: 'baseline'
+   ```
+
+4. ```
    AttributeError: 'FridaManager' object has no attribute 'load_script'
    ```
 
@@ -56,9 +60,11 @@ Please follow the detailed instructions in `FIX_INSTRUCTIONS.md`.
 
 ## What These Fixes Do
 
-1. **SensorSimulator Fix**: Replaces the call to the non-existent `set_profile()` method with code that creates a device profile and sets the `current_profile` property directly. Also adds the required `simulation_parameters` to prevent the KeyError.
+1. **SensorSimulator set_profile Fix**: Replaces the call to the non-existent `set_profile()` method with code that creates a device profile and sets the `current_profile` property directly. Also adds the required `simulation_parameters` to prevent the KeyError.
 
-2. **FridaManager Fix**: Adds compatibility methods (`load_script()`, `set_target_package()` and `start_monitoring()`) to the FridaManager class to make it compatible with the GUI code.
+2. **SensorSimulator baseline Fix**: Adds defensive code to handle sensor profiles that don't have the expected `baseline` and `variance` fields, providing sensible defaults based on sensor type.
+
+3. **FridaManager Fix**: Adds compatibility methods (`load_script()`, `set_target_package()` and `start_monitoring()`) to the FridaManager class to make it compatible with the GUI code.
 
 ## Files Included in This Fix
 

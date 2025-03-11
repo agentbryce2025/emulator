@@ -81,6 +81,111 @@ def fix_sensor_simulator_issues(content):
     
     return content
 
+def fix_sensor_simulator_class():
+    """Fix sensor simulator's internal issues related to missing baseline and variance fields"""
+    sensor_sim_path = os.path.join(script_dir, "src", "anti_detection", "sensor_simulator.py")
+    
+    if not os.path.exists(sensor_sim_path):
+        print(f"Warning: Could not find {sensor_sim_path}")
+        print("SensorSimulator class will not be modified. This may cause issues.")
+        return False
+    
+    print("Adding defensive code to SensorSimulator class...")
+    
+    # Read the file
+    with open(sensor_sim_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    # Fix the _simulation_loop method to handle missing baseline keys
+    if "drift_values = {sensor: {axis: 0.0 for axis in data[\"baseline\"].keys()}" in content:
+        old_code = '''        drift_values = {sensor: {axis: 0.0 for axis in data["baseline"].keys()} 
+                        for sensor, data in self.current_profile["sensors"].items()}'''
+        
+        new_code = '''        # Initialize drift values with defensive code for profiles that might not have baseline defined
+        drift_values = {}
+        for sensor, data in self.current_profile["sensors"].items():
+            if "baseline" in data:
+                drift_values[sensor] = {axis: 0.0 for axis in data["baseline"].keys()}
+            elif sensor == "accelerometer":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "gyroscope":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "magnetometer":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "proximity":
+                drift_values[sensor] = {"distance": 0.0}
+            elif sensor == "light":
+                drift_values[sensor] = {"lux": 0.0}
+            elif sensor == "pressure":
+                drift_values[sensor] = {"hPa": 0.0}
+            elif sensor == "temperature":
+                drift_values[sensor] = {"celsius": 0.0}
+            elif sensor == "humidity":
+                drift_values[sensor] = {"percent": 0.0}
+            else:
+                # For unknown sensors, try to extract keys or use a default
+                try:
+                    drift_values[sensor] = {k: 0.0 for k in data.keys() if isinstance(k, str) and k != "enabled"}
+                except (AttributeError, TypeError):
+                    drift_values[sensor] = {"value": 0.0}'''
+        
+        content = content.replace(old_code, new_code)
+    
+    # Fix the sensor update code to handle missing baseline and variance
+    if "baseline = sensor_config[\"baseline\"]" in content:
+        old_code = '''                baseline = sensor_config["baseline"]
+                variance = sensor_config["variance"]'''
+        
+        new_code = '''                # Handle profiles that might not have baseline and variance fields
+                if "baseline" not in sensor_config or "variance" not in sensor_config:
+                    # Add default values based on sensor type
+                    if sensor_name == "accelerometer":
+                        baseline = {"x": 0.0, "y": 0.0, "z": 9.81}
+                        variance = {"x": 0.1, "y": 0.1, "z": 0.1}
+                    elif sensor_name == "gyroscope":
+                        baseline = {"x": 0.0, "y": 0.0, "z": 0.0}
+                        variance = {"x": 0.02, "y": 0.02, "z": 0.02}
+                    elif sensor_name == "magnetometer":
+                        baseline = {"x": 25.0, "y": 10.0, "z": 40.0}
+                        variance = {"x": 2.0, "y": 2.0, "z": 2.0}
+                    elif sensor_name == "proximity":
+                        baseline = {"distance": 100.0}
+                        variance = {"distance": 0.0}
+                    elif sensor_name == "light":
+                        baseline = {"lux": 500.0}
+                        variance = {"lux": 50.0}
+                    elif sensor_name == "pressure":
+                        baseline = {"hPa": 1013.25}
+                        variance = {"hPa": 0.5}
+                    elif sensor_name == "temperature":
+                        baseline = {"celsius": 22.0}
+                        variance = {"celsius": 0.5}
+                    elif sensor_name == "humidity":
+                        baseline = {"percent": 50.0}
+                        variance = {"percent": 1.0}
+                    else:
+                        # For unknown sensors, try to create reasonable defaults
+                        baseline = {"value": 0.0}
+                        variance = {"value": 0.1}
+                else:
+                    baseline = sensor_config["baseline"]
+                    variance = sensor_config["variance"]'''
+        
+        content = content.replace(old_code, new_code)
+    
+    # Back up the original file
+    backup_path = sensor_sim_path + ".bak"
+    with open(backup_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Original SensorSimulator file backed up to {backup_path}")
+    
+    # Write the fixed content
+    with open(sensor_sim_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    
+    print(f"Defensive code added to {sensor_sim_path}")
+    return True
+
 def fix_frida_manager_issues(content):
     """Fix the FridaManager.load_script issue in emulator_gui.py"""
     if "self.frida_manager.load_script(" in content:
@@ -279,8 +384,11 @@ def fix_emulator():
     
     print(f"Fixes applied to {emulator_gui_path}")
     
-    # Fix FridaManager class
+    # Fix the FridaManager class
     fix_frida_manager_class()
+    
+    # Fix the SensorSimulator class
+    fix_sensor_simulator_class()
     
     print("\nAll fixes have been applied!")
     print("You can now run the emulator with: python main.py")
@@ -292,7 +400,8 @@ if __name__ == "__main__":
     print("This script fixes multiple issues in the emulator code:")
     print("1. SensorSimulator.set_profile error")
     print("2. Missing simulation_parameters in sensor profiles")
-    print("3. FridaManager.load_script compatibility")
+    print("3. KeyError 'baseline' in SensorSimulator._simulation_loop")
+    print("4. FridaManager.load_script compatibility")
     print()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))

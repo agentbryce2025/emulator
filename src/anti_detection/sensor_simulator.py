@@ -449,8 +449,33 @@ class SensorSimulator:
         """Main simulation loop that updates sensor values."""
         update_interval = 1.0 / self.current_profile["simulation_parameters"].get("update_frequency", 50)
         
-        drift_values = {sensor: {axis: 0.0 for axis in data["baseline"].keys()} 
-                        for sensor, data in self.current_profile["sensors"].items()}
+        # Initialize drift values with defensive code for profiles that might not have baseline defined
+        drift_values = {}
+        for sensor, data in self.current_profile["sensors"].items():
+            if "baseline" in data:
+                drift_values[sensor] = {axis: 0.0 for axis in data["baseline"].keys()}
+            elif sensor == "accelerometer":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "gyroscope":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "magnetometer":
+                drift_values[sensor] = {"x": 0.0, "y": 0.0, "z": 0.0}
+            elif sensor == "proximity":
+                drift_values[sensor] = {"distance": 0.0}
+            elif sensor == "light":
+                drift_values[sensor] = {"lux": 0.0}
+            elif sensor == "pressure":
+                drift_values[sensor] = {"hPa": 0.0}
+            elif sensor == "temperature":
+                drift_values[sensor] = {"celsius": 0.0}
+            elif sensor == "humidity":
+                drift_values[sensor] = {"percent": 0.0}
+            else:
+                # For unknown sensors, try to extract keys or use a default
+                try:
+                    drift_values[sensor] = {k: 0.0 for k in data.keys() if isinstance(k, str) and k != "enabled"}
+                except (AttributeError, TypeError):
+                    drift_values[sensor] = {"value": 0.0}
         
         pattern_time = 0.0
         last_significant_change = time.time()
@@ -469,8 +494,40 @@ class SensorSimulator:
                 if not sensor_config.get("enabled", False):
                     continue
                     
-                baseline = sensor_config["baseline"]
-                variance = sensor_config["variance"]
+                # Handle profiles that might not have baseline and variance fields
+                if "baseline" not in sensor_config or "variance" not in sensor_config:
+                    # Add default values based on sensor type
+                    if sensor_name == "accelerometer":
+                        baseline = {"x": 0.0, "y": 0.0, "z": 9.81}
+                        variance = {"x": 0.1, "y": 0.1, "z": 0.1}
+                    elif sensor_name == "gyroscope":
+                        baseline = {"x": 0.0, "y": 0.0, "z": 0.0}
+                        variance = {"x": 0.02, "y": 0.02, "z": 0.02}
+                    elif sensor_name == "magnetometer":
+                        baseline = {"x": 25.0, "y": 10.0, "z": 40.0}
+                        variance = {"x": 2.0, "y": 2.0, "z": 2.0}
+                    elif sensor_name == "proximity":
+                        baseline = {"distance": 100.0}
+                        variance = {"distance": 0.0}
+                    elif sensor_name == "light":
+                        baseline = {"lux": 500.0}
+                        variance = {"lux": 50.0}
+                    elif sensor_name == "pressure":
+                        baseline = {"hPa": 1013.25}
+                        variance = {"hPa": 0.5}
+                    elif sensor_name == "temperature":
+                        baseline = {"celsius": 22.0}
+                        variance = {"celsius": 0.5}
+                    elif sensor_name == "humidity":
+                        baseline = {"percent": 50.0}
+                        variance = {"percent": 1.0}
+                    else:
+                        # For unknown sensors, try to create reasonable defaults
+                        baseline = {"value": 0.0}
+                        variance = {"value": 0.1}
+                else:
+                    baseline = sensor_config["baseline"]
+                    variance = sensor_config["variance"]
                 
                 # Apply pattern if defined
                 pattern_values = self._calculate_pattern_values(sensor_name, pattern_time)
