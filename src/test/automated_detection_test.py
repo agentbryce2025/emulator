@@ -81,8 +81,12 @@ class AutomatedDetectionTest:
                 selected_image = available_images[0]
         else:
             selected_image = available_images[0]
+        
+        # Check if selected_image has a 'name' key, if not create it from the path
+        if 'name' not in selected_image and 'path' in selected_image:
+            selected_image['name'] = os.path.basename(selected_image['path'])
             
-        logger.info(f"Using Android image: {selected_image['name']}")
+        logger.info(f"Using Android image: {selected_image.get('name', selected_image['path'])}")
         self.qemu.set_param("cdrom", selected_image['path'])
         
         # Create a data image for this test

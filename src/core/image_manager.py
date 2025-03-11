@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 class ImageManager:
     """Handles Android-x86 image downloading and management."""
     
-    # Official Android-x86 mirror list
+    # Official Android-x86 mirror list with direct download links
     MIRROR_LIST = [
-        "https://osdn.net/projects/android-x86/downloads/",
         "https://sourceforge.net/projects/android-x86/files/",
+        "https://osdn.net/projects/android-x86/downloads/",
         "https://ftp.nluug.nl/pub/os/Linux/distr/android-x86/",
     ]
     
@@ -35,6 +35,16 @@ class ImageManager:
         "7.1-r5",
         "6.0-r3"
     ]
+    
+    # Direct download URLs for specific images
+    DIRECT_URLS = {
+        "9.0-r2": {
+            "x86_64": "https://iweb.dl.sourceforge.net/project/android-x86/Release%209.0/android-x86_64-9.0-r2.iso"
+        },
+        "8.1-r6": {
+            "x86_64": "https://iweb.dl.sourceforge.net/project/android-x86/Release%208.1/android-x86_64-8.1-r6.iso"
+        }
+    }
     
     def __init__(self, storage_dir=None):
         """Initialize the image manager with optional storage directory."""
@@ -115,24 +125,29 @@ class ImageManager:
         # Official files are typically hosted in a version-specific directory
         version_dir = version
         
-        # Find download URL by trying mirrors
+        # Check if we have a direct URL
         download_url = None
-        for mirror in self.MIRROR_LIST:
-            try:
-                if "osdn.net" in mirror:
-                    url = f"{mirror}{version_dir}/{image_filename}"
-                elif "sourceforge.net" in mirror:
-                    url = f"{mirror}{version_dir}/{image_filename}/download"
-                else:
-                    url = f"{mirror}{version_dir}/{image_filename}"
-                    
-                # Check if URL exists (HEAD request)
-                response = requests.head(url, allow_redirects=True, timeout=10)
-                if response.status_code == 200:
-                    download_url = url
-                    break
-            except Exception as e:
-                logger.warning(f"Failed to check mirror {mirror}: {str(e)}")
+        if version in self.DIRECT_URLS and image_type in self.DIRECT_URLS[version]:
+            download_url = self.DIRECT_URLS[version][image_type]
+            logger.info(f"Using direct download URL for {version} {image_type}: {download_url}")
+        else:
+            # Find download URL by trying mirrors
+            for mirror in self.MIRROR_LIST:
+                try:
+                    if "osdn.net" in mirror:
+                        url = f"{mirror}{version_dir}/{image_filename}"
+                    elif "sourceforge.net" in mirror:
+                        url = f"{mirror}{version_dir}/{image_filename}/download"
+                    else:
+                        url = f"{mirror}{version_dir}/{image_filename}"
+                        
+                    # Check if URL exists (HEAD request)
+                    response = requests.head(url, allow_redirects=True, timeout=10)
+                    if response.status_code == 200:
+                        download_url = url
+                        break
+                except Exception as e:
+                    logger.warning(f"Failed to check mirror {mirror}: {str(e)}")
                 
         if not download_url:
             logger.error(f"Could not find download URL for Android-x86 {version} {image_type}")
