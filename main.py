@@ -60,6 +60,7 @@ def parse_arguments():
     parser.add_argument("--target-app", help="Target app package name (e.g., com.linkedin.android)")
     parser.add_argument("--frida-script", help="Path to custom Frida script to use")
     parser.add_argument("--linkedin-mode", action="store_true", help="Enable LinkedIn-specific detection bypass")
+    parser.add_argument("--qemu-path", help="Full path to QEMU executable (e.g., C:\\Program Files\\qemu\\qemu-system-x86_64.exe)")
     
     return parser.parse_args()
 
@@ -69,6 +70,12 @@ def run_headless(args):
     
     # Initialize components
     qemu = QEMUWrapper()
+    
+    # Set QEMU path if provided
+    if args.qemu_path:
+        logger.info(f"Using QEMU path from command line: {args.qemu_path}")
+        qemu.qemu_path = args.qemu_path
+    
     image_manager = ImageManager()
     android_customizer = AndroidCustomizer()
     
@@ -209,12 +216,26 @@ def run_headless(args):
         logger.error("Failed to start emulator")
         return 1
 
-def run_gui():
+def run_gui(args=None):
     """Run the emulator with GUI."""
     logger.info("Starting with GUI")
     
     app = QApplication(sys.argv)
     window = EmulatorGUI()
+    
+    # If QEMU path was specified via command line, set it in the GUI
+    if args and args.qemu_path:
+        qemu_path = args.qemu_path
+        logger.info(f"Using QEMU path from command line: {qemu_path}")
+        window.qemu.qemu_path = qemu_path
+        
+        # Also update the GUI textbox if it exists
+        if hasattr(window, 'qemu_path_input'):
+            window.qemu_path_input.setText(qemu_path)
+            
+        # Save the configuration for future use
+        window.qemu.save_config()
+        
     window.show()
     
     return app.exec_() if hasattr(app, 'exec_') else app.exec()
@@ -226,20 +247,69 @@ def main():
     logger.info("Undetected Android Emulator starting")
     
     # Check for required tools
-    try:
-        import subprocess
-        result = subprocess.run(["qemu-system-x86_64", "--version"], 
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            logger.warning("QEMU not found in PATH. Make sure QEMU is installed.")
-    except FileNotFoundError:
+    import subprocess
+    import os
+    import platform
+    
+    def check_qemu_installed():
+        """Check if QEMU is installed and accessible."""
+        try:
+            # Standard check for most systems
+            result = subprocess.run(["qemu-system-x86_64", "--version"], 
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                shell=False)
+            return result.returncode == 0
+        except (FileNotFoundError, subprocess.SubprocessError):
+            # Check common installation locations on Windows
+            if platform.system() == "Windows":
+                possible_paths = [
+                    "C:\\Program Files\\qemu\\qemu-system-x86_64.exe",
+                    "C:\\Program Files (x86)\\qemu\\qemu-system-x86_64.exe",
+                    os.path.expanduser("~\\qemu\\qemu-system-x86_64.exe"),
+                ]
+                
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        logger.info(f"Found QEMU at: {path}")
+                        # Store this path for later use
+                        if not os.path.exists(os.path.expanduser("~/.config/undetected-emulator")):
+                            os.makedirs(os.path.expanduser("~/.config/undetected-emulator"), exist_ok=True)
+                        
+                        # Save the path to a config file
+                        try:
+                            with open(os.path.expanduser("~/.config/undetected-emulator/qemu.conf"), "w") as f:
+                                f.write(f"qemu_path={path}")
+                        except Exception as e:
+                            logger.warning(f"Could not save QEMU path to config: {e}")
+                            
+                        return True
+            
+            return False
+                
+    if not check_qemu_installed():
         logger.warning("QEMU not found. Please install QEMU to run the emulator.")
     
     try:
+        # Set the QEMU path explicitly if provided as an argument
+        if args.qemu_path:
+            logger.info(f"Command-line QEMU path provided: {args.qemu_path}")
+            
+            # Ensure the config directory exists
+            config_dir = os.path.expanduser("~/.config/undetected-emulator")
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # Save this to a config file for future use
+            try:
+                with open(os.path.join(config_dir, "qemu.conf"), "w") as f:
+                    f.write(f"qemu_path={args.qemu_path}\n")
+                logger.info("Saved QEMU path to configuration file")
+            except Exception as e:
+                logger.warning(f"Could not save QEMU path to config: {e}")
+            
         if args.no_gui:
             return run_headless(args)
         else:
-            return run_gui()
+            return run_gui(args)
     except Exception as e:
         logger.exception(f"Unhandled exception: {str(e)}")
         return 1

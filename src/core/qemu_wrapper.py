@@ -37,8 +37,30 @@ class QEMUWrapper:
             "audio": "pa",
         }
         
+        # Default QEMU path
+        self.qemu_path = "qemu-system-x86_64"
+        
         # Load configuration if available
         self._load_config()
+        
+        # Check for direct path to QEMU on Windows
+        import platform
+        if platform.system() == "Windows":
+            common_paths = [
+                "C:\\Program Files\\qemu\\qemu-system-x86_64.exe",
+                "C:\\Program Files (x86)\\qemu\\qemu-system-x86_64.exe",
+            ]
+            
+            # Check if we loaded a path from config
+            if hasattr(self, "qemu_path") and os.path.exists(self.qemu_path):
+                pass  # Use the path we already loaded
+            else:
+                # Try the common paths
+                for path in common_paths:
+                    if os.path.exists(path):
+                        self.qemu_path = path
+                        logger.info(f"Using QEMU at: {path}")
+                        break
         
     def _load_config(self):
         """Load QEMU configuration from file."""
@@ -52,8 +74,15 @@ class QEMUWrapper:
                 for line in f:
                     if "=" in line and not line.strip().startswith("#"):
                         key, value = line.strip().split("=", 1)
-                        self.params[key.strip()] = value.strip()
+                        if key.strip() == "qemu_path":
+                            # Special handling for qemu_path
+                            self.qemu_path = value.strip()
+                        else:
+                            self.params[key.strip()] = value.strip()
             logger.info(f"Loaded configuration from {self.config_path}")
+            
+            if hasattr(self, "qemu_path") and self.qemu_path:
+                logger.info(f"Using QEMU path from config: {self.qemu_path}")
         except Exception as e:
             logger.error(f"Error loading configuration: {str(e)}")
             
@@ -65,8 +94,17 @@ class QEMUWrapper:
             
         try:
             with open(self.config_path, "w") as f:
+                f.write("# QEMU configuration for undetected Android emulator\n")
+                f.write("# Generated automatically\n\n")
+                
+                # Save the QEMU path first
+                if hasattr(self, "qemu_path") and self.qemu_path:
+                    f.write(f"qemu_path={self.qemu_path}\n\n")
+                
+                # Save other parameters
                 for key, value in self.params.items():
                     f.write(f"{key}={value}\n")
+                    
             logger.info(f"Saved configuration to {self.config_path}")
         except Exception as e:
             logger.error(f"Error saving configuration: {str(e)}")
@@ -81,7 +119,7 @@ class QEMUWrapper:
         
     def build_command(self):
         """Build the QEMU command line."""
-        cmd = ["qemu-system-x86_64"]
+        cmd = [self.qemu_path]
         
         for key, value in self.params.items():
             if value == "on":

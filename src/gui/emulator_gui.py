@@ -19,7 +19,7 @@ try:
         QCheckBox, QFileDialog, QMessageBox, QSlider, QTextEdit, QSplitter,
         QListWidget, QListWidgetItem, QProgressBar, QSpinBox, QInputDialog
     )
-    from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+    from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
     from PyQt5.QtGui import QIcon, QPixmap
     USE_PYQT5 = True
 except ImportError:
@@ -30,7 +30,7 @@ except ImportError:
             QCheckBox, QFileDialog, QMessageBox, QSlider, QTextEdit, QSplitter,
             QListWidget, QListWidgetItem, QProgressBar, QSpinBox, QInputDialog
         )
-        from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal
+        from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QObject
         from PySide6.QtGui import QIcon, QPixmap
         USE_PYQT5 = False
     except ImportError:
@@ -314,7 +314,10 @@ class EmulatorGUI(QMainWindow):
         qemu_layout = QFormLayout(qemu_group)
         
         self.qemu_path_input = QLineEdit()
-        self.qemu_path_input.setText("qemu-system-x86_64")
+        
+        # Set the input field to the current QEMU path from the wrapper
+        current_path = self.qemu.qemu_path if hasattr(self.qemu, 'qemu_path') else "qemu-system-x86_64"
+        self.qemu_path_input.setText(current_path)
         
         qemu_path_layout = QHBoxLayout()
         qemu_path_layout.addWidget(self.qemu_path_input)
@@ -322,6 +325,10 @@ class EmulatorGUI(QMainWindow):
         browse_button = QPushButton("Browse")
         browse_button.clicked.connect(self.browse_qemu_path)
         qemu_path_layout.addWidget(browse_button)
+        
+        apply_button = QPushButton("Apply")
+        apply_button.clicked.connect(self.apply_qemu_path)
+        qemu_path_layout.addWidget(apply_button)
         
         qemu_layout.addRow("QEMU Path:", qemu_path_layout)
         
@@ -466,15 +473,57 @@ class EmulatorGUI(QMainWindow):
         
     def browse_qemu_path(self):
         """Browse for QEMU executable."""
+        import platform
+        
+        # Set appropriate starting directory based on platform
+        if platform.system() == "Windows":
+            start_dir = "C:\\Program Files\\qemu"
+            if not os.path.exists(start_dir):
+                start_dir = "C:\\"
+        else:
+            start_dir = "/usr/bin"
+            
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select QEMU Executable",
-            "/usr/bin",
-            "All Files (*)"
+            start_dir,
+            "Executables (*.exe);;All Files (*)" if platform.system() == "Windows" else "All Files (*)"
         )
         
         if file_path:
             self.qemu_path_input.setText(file_path)
+            
+    def apply_qemu_path(self):
+        """Apply the QEMU path to the configuration."""
+        new_path = self.qemu_path_input.text().strip()
+        
+        if not new_path:
+            QMessageBox.warning(self, "Invalid Path", "Please enter a valid path to QEMU executable.")
+            return
+            
+        # Check if the file exists
+        if not os.path.exists(new_path):
+            response = QMessageBox.question(
+                self,
+                "Path Not Found",
+                f"The specified path '{new_path}' does not exist. Do you want to save it anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if response != QMessageBox.Yes:
+                return
+        
+        # Set the path in the QEMU wrapper
+        self.qemu.qemu_path = new_path
+        
+        # Save the configuration
+        success = self.qemu.save_config()
+        
+        if success:
+            QMessageBox.information(self, "Success", "QEMU path updated successfully!")
+        else:
+            QMessageBox.warning(self, "Error", "Failed to save QEMU configuration.")
             
     def toggle_debug_logging(self, state):
         """Toggle debug logging."""

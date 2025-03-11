@@ -89,8 +89,18 @@ If you see "QEMU not found" errors:
    - Linux: `sudo apt install qemu-system-x86`
    
 2. **Add QEMU to PATH**: Ensure the QEMU installation directory is in your system PATH
+   - Windows: Add `C:\Program Files\qemu` to your PATH in System Properties
 
-3. **Specify QEMU path**: In the emulator GUI, go to Settings tab and provide the full path to the QEMU executable
+3. **Specify QEMU path in the GUI**: 
+   - In the emulator GUI, go to the Settings tab
+   - Enter the full path to QEMU (e.g., `C:\Program Files\qemu\qemu-system-x86_64.exe`)
+   - Click "Apply" to save the setting
+
+4. **Git Bash Users on Windows**:
+   - Git Bash may not see the system PATH correctly
+   - Use the Settings tab to manually set the QEMU path
+   - Or specify the full path: `python main.py --qemu-path="C:\Program Files\qemu\qemu-system-x86_64.exe"`
+   - Alternatively, run the emulator using Command Prompt or PowerShell instead
 
 #### GUI Display Issues
 If you encounter problems with the GUI display:
