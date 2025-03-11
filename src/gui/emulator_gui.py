@@ -712,14 +712,17 @@ class EmulatorGUI(QMainWindow):
             # Configure sensor simulation
             if self.enable_sensors_checkbox.isChecked():
                 if "sensors" in self.selected_device_profile:
-                    sensor_profile = {
+                    # Create a device profile based on the device type
+                    device_type = "smartphone"  # Default device type
+                    self.sensor_simulator.create_device_profile(device_type)
+                    # We have to manually set the current_profile
+                    self.sensor_simulator.current_profile = {
                         "sensors": self.selected_device_profile["sensors"],
                         "device": {
                             "manufacturer": self.selected_device_profile["manufacturer"],
                             "model": self.selected_device_profile["model"]
                         }
                     }
-                    self.sensor_simulator.set_profile(sensor_profile)
                     logger.info("Configured sensor simulation from device profile")
             
         # Start the emulator
