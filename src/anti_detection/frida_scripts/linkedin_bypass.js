@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /*
  * LinkedIn-specific detection bypass script for Frida.
  * This script specifically targets LinkedIn's detection methods.
@@ -353,11 +352,8 @@
             LinkedInBypass.init(profile);
         }
     };
-=======
-// LinkedIn Emulator Detection Bypass Script
-// This script hooks into LinkedIn's app to bypass emulator detection
 
-(function() {
+/* End of first implementation */
     'use strict';
     
     console.log("[+] LinkedIn Emulator Detection Bypass Script Loaded");
@@ -740,5 +736,4 @@
     } catch (e) {
         console.log("[-] Error setting up LinkedIn emulator detection bypass: " + e);
     }
->>>>>>> bf3bed0 (Implemented multiple enhancements to the emulator project:)
 })();

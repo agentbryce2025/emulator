@@ -55,13 +55,34 @@ python main.py
 python main.py --no-gui --linkedin-mode --target-app com.linkedin.android
 ```
 
+## New Feature: Automated Testing Framework
+We're excited to announce the addition of an automated testing framework that helps verify the effectiveness of our emulator detection bypasses:
+
+- **Comprehensive Test Suite**: Automatically tests against various detection methods
+- **Device Profile Testing**: Runs tests against all device profiles to ensure consistent bypass
+- **Detailed Reports**: Generates CSV reports with test results and detection methods used
+- **Simple Command-Line Interface**: Easy to integrate into CI/CD pipelines
+- **LinkedIn-Specific Tests**: Specialized tests for LinkedIn's detection methods
+
+### Usage
+```bash
+# Run automated tests with default settings
+python -m src.test.automated_detection_test
+
+# Test with a specific device profile
+python -m src.test.automated_detection_test --profile "Google Pixel 6"
+
+# Specify Android version and test duration
+python -m src.test.automated_detection_test --android-version 9.0 --duration 120
+```
+
 ## Future Development
 Our roadmap includes:
 - More device profiles with realistic hardware configurations
 - Behavioral analysis to detect and prevent emulator detection
-- Automated testing framework for detection bypass verification
 - Cloud profile database for community-contributed device profiles
 - Support for running multiple emulator instances simultaneously
+- Machine learning for realistic sensor pattern generation
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request with improvements or bug fixes.
