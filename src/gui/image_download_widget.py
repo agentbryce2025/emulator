@@ -165,7 +165,8 @@ class ImageDownloadWidget(QWidget):
         for image in available_images:
             item = QListWidgetItem()
             item.setText(f"{image['filename']} ({self.format_size(image['size'])})")
-            item.setData(Qt.UserRole, image['path'])
+            # Store the entire image info dictionary
+            item.setData(Qt.UserRole, image)
             self.image_list.addItem(item)
             
     def format_size(self, size_bytes):
@@ -184,7 +185,8 @@ class ImageDownloadWidget(QWidget):
         # Check if image already exists
         for i in range(self.image_list.count()):
             item = self.image_list.item(i)
-            path = item.data(Qt.UserRole)
+            image_info = item.data(Qt.UserRole)
+            path = image_info['path']
             if f"android-x86_{version}_{image_type}.iso" in path:
                 QMessageBox.information(
                     self,
@@ -237,20 +239,21 @@ class ImageDownloadWidget(QWidget):
         """Handle image selection in the list."""
         items = self.image_list.selectedItems()
         if items:
-            image_path = items[0].data(Qt.UserRole)
-            self.image_selected.emit(image_path)
+            image_info = items[0].data(Qt.UserRole)
+            self.image_selected.emit(image_info)
             
     def delete_selected_image(self):
         """Delete the selected image."""
         items = self.image_list.selectedItems()
         if items:
-            image_path = items[0].data(Qt.UserRole)
+            image_info = items[0].data(Qt.UserRole)
+            image_path = image_info['path']
             
             # Ask for confirmation
             reply = QMessageBox.question(
                 self,
                 "Confirm Deletion",
-                f"Are you sure you want to delete the selected image?\n\n{image_path}",
+                f"Are you sure you want to delete the selected image?\n\n{image_info['filename']}",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
@@ -377,6 +380,7 @@ class ImageDownloadWidget(QWidget):
                     image_info = item.data(Qt.UserRole)
                     if image_info["path"] == target_path:
                         self.image_list.setCurrentItem(item)
+                        # Emit the selected image info
                         self.image_selected.emit(image_info)
                         break
             finally:
@@ -425,7 +429,7 @@ class ImageDownloadWidget(QWidget):
                 )
                 
     def get_selected_image(self):
-        """Get the path of the currently selected image, or None if none selected."""
+        """Get the image info of the currently selected image, or None if none selected."""
         items = self.image_list.selectedItems()
         if items:
             return items[0].data(Qt.UserRole)

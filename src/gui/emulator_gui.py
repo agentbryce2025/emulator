@@ -459,11 +459,12 @@ class EmulatorGUI(QMainWindow):
             else:
                 self.status_text.setText("Emulator not configured. Please select a system image and device profile.")
     
-    def on_system_image_selected(self, image_path):
+    def on_system_image_selected(self, image_info):
         """Handle system image selection."""
-        self.selected_system_image = image_path
-        self.system_image_label.setText(os.path.basename(image_path))
-        logger.info(f"Selected system image: {image_path}")
+        # Store the path from the image info dictionary
+        self.selected_system_image = image_info['path']
+        self.system_image_label.setText(image_info['filename'])
+        logger.info(f"Selected system image: {image_info['filename']}")
         
     def on_device_profile_selected(self, profile):
         """Handle device profile selection."""
