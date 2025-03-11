@@ -277,8 +277,22 @@ class LinkedInDetectionTest:
         
         return script
         
-    def run_test(self, duration=60):
+    def run_test(self, duration=60, dry_run=False):
         """Run the LinkedIn detection test for a specified duration (seconds)."""
+        if dry_run:
+            logger.info("Running in dry-run mode, simulating successful test")
+            self.test_results["success"] = True
+            self.test_results["summary"] = "Dry-run mode - Simulated successful detection bypass"
+            self.test_results["detection_methods"] = {
+                "build_props": {"detected": False, "attempts": 5},
+                "system_props": {"detected": False, "attempts": 3},
+                "device_ids": {"detected": False, "attempts": 2},
+                "sensors": {"detected": False, "attempts": 8},
+                "files": {"detected": False, "attempts": 1},
+                "network": {"detected": False, "attempts": 4}
+            }
+            return self.test_results
+            
         if not self.frida_manager or not self.frida_manager.connected:
             logger.error("Frida not connected, can't run test")
             self.test_results["summary"] = "Failed: Frida not connected"

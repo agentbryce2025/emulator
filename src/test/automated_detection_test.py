@@ -167,7 +167,10 @@ class AutomatedDetectionTest:
         # Run the LinkedIn detection test
         try:
             linkedin_test = LinkedInDetectionTest()
-            results = linkedin_test.run_test(duration=test_case.get("duration", 60))
+            results = linkedin_test.run_test(
+                duration=test_case.get("duration", 60),
+                dry_run=self.dry_run
+            )
             
             # Save results to file
             timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -191,7 +194,7 @@ class AutomatedDetectionTest:
             
     def _stop_emulator(self):
         """Stop the emulator and clean up."""
-        if self.sensor_simulator.sensor_simulation_active:
+        if hasattr(self.sensor_simulator, 'simulation_active') and self.sensor_simulator.simulation_active:
             self.sensor_simulator.stop_simulation()
             logger.info("Stopped sensor simulation")
             
