@@ -20,6 +20,8 @@ The emulator is failing with the following errors:
    AttributeError: 'FridaManager' object has no attribute 'load_script'
    ```
 
+5. QEMU window not appearing on Windows (due to incompatible display and acceleration settings)
+
 These errors occur because of mismatches between the method names and expected properties in different parts of the code.
 
 ## How to Fix
@@ -230,6 +232,27 @@ with:
                     variance = sensor_config["variance"]
 ```
 
+#### Fix 4: Windows QEMU Launch Fix
+
+If QEMU doesn't show a window when launched on Windows:
+
+1. Use the provided direct launcher scripts:
+   - Run `run_qemu.bat` for a direct command-line launch
+   - Or run `python direct_launch.py` which handles Windows-specific process creation
+
+2. If you want to fix the core emulator:
+   - Edit your configuration file at `C:\Users\YOUR_USERNAME\.config\undetected-emulator\qemu.conf`
+   - Change these settings:
+     ```
+     display=sdl
+     vga=std
+     ```
+   - Remove these lines if they exist:
+     ```
+     accelerate=kvm
+     audio=pa
+     ```
+
 ## What These Fixes Do
 
 1. **SensorSimulator set_profile Fix**: Replaces the call to the non-existent `set_profile()` method with code that creates a device profile and sets the `current_profile` property directly, including the required `simulation_parameters`.
@@ -237,5 +260,12 @@ with:
 2. **SensorSimulator baseline Fix**: Adds defensive code to handle sensor profiles that don't have the expected `baseline` and `variance` fields, providing sensible defaults based on sensor type.
 
 3. **FridaManager Fix**: Adds compatibility methods to handle the calls to `load_script()`, `set_target_package()`, and `start_monitoring()` that are used in the GUI code.
+
+4. **Windows QEMU Fix**: Updates the QEMU parameters and process creation to be compatible with Windows:
+   - Changes display backend from GTK (Linux-only) to SDL (cross-platform)
+   - Changes VGA from virtio to std for wider compatibility
+   - Removes KVM acceleration which is Linux-only
+   - Removes PulseAudio which is Linux-only
+   - Uses Windows-specific process creation flags to ensure the window stays open
 
 After applying these fixes, the emulator should now work correctly without those errors.

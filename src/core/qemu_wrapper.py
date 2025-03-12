@@ -28,13 +28,13 @@ class QEMUWrapper:
             "smp": "4",
             "hda": "",
             "cpu": "host",
-            "vga": "virtio",
-            "display": "gtk",
+            "vga": "std",  # Changed from virtio to std for wider compatibility
+            "display": "sdl",  # Changed from gtk to sdl for Windows compatibility
             "net": "user",
             "usb": "on",
             "usbdevice": "tablet",
-            "accelerate": "kvm",
-            "audio": "pa",
+            # Removed accelerate=kvm as it's not available on Windows
+            # Removed audio=pa as PulseAudio is not available on Windows
         }
         
         # Default QEMU path
@@ -140,14 +140,48 @@ class QEMUWrapper:
         logger.info(f"Starting QEMU with command: {' '.join(cmd)}")
         
         try:
-            self.qemu_process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
+            # Check platform for Windows-specific behaviors
+            import platform
+            if platform.system() == "Windows":
+                # On Windows, start the process with shell=True and without pipes to ensure proper window creation
+                # and prevent console window from showing and hiding immediately
+                startupinfo = None
+                try:
+                    # Import Windows-specific modules if available
+                    import subprocess
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 1  # SW_SHOWNORMAL
+                except (ImportError, AttributeError):
+                    pass  # Not on Windows or older Python version
+                
+                # Use creationflags to ensure the window stays open
+                creation_flags = subprocess.CREATE_NEW_CONSOLE
+                
+                # Run with shell=True to handle any path issues
+                cmd_str = " ".join(f'"{c}"' if " " in str(c) else str(c) for c in cmd)
+                logger.info(f"Windows command string: {cmd_str}")
+                
+                self.qemu_process = subprocess.Popen(
+                    cmd_str, 
+                    shell=True,
+                    startupinfo=startupinfo,
+                    creationflags=creation_flags
+                )
+            else:
+                # On Linux/macOS, use the standard approach
+                self.qemu_process = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+                
             self.is_running = True
             logger.info(f"QEMU started with PID {self.qemu_process.pid}")
             return True
         except Exception as e:
             logger.error(f"Error starting QEMU: {str(e)}")
+            # Log more details in case of error
+            import traceback
+            logger.error(f"Detailed error: {traceback.format_exc()}")
             return False
             
     def stop(self):

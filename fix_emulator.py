@@ -390,8 +390,145 @@ def fix_emulator():
     # Fix the SensorSimulator class
     fix_sensor_simulator_class()
     
+    # Fix Windows-specific QEMU issues if on Windows
+    import platform
+    if platform.system() == "Windows":
+        print("\nDetected Windows system, applying QEMU compatibility fixes...")
+        fix_qemu_windows_issues()
+    
     print("\nAll fixes have been applied!")
     print("You can now run the emulator with: python main.py")
+    print("Windows users: If no QEMU window appears, try using run_qemu.bat or python direct_launch.py")
+    return True
+
+def fix_qemu_windows_issues():
+    """Add Windows compatibility fixes for QEMU"""
+    qemu_wrapper_path = os.path.join(script_dir, "src", "core", "qemu_wrapper.py")
+    
+    if not os.path.exists(qemu_wrapper_path):
+        print(f"Warning: Could not find {qemu_wrapper_path}")
+        print("QEMUWrapper class will not be modified. This may cause issues on Windows.")
+        return False
+    
+    print("Adding Windows compatibility to QEMUWrapper class...")
+    
+    # Read the file
+    with open(qemu_wrapper_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    # Update default parameters for Windows compatibility
+    windows_params_updated = False
+    if '"vga": "virtio",' in content and '"display": "gtk",' in content:
+        old_params = '''        # Default QEMU parameters
+        self.params = {
+            "memory": "2048",
+            "smp": "4",
+            "hda": "",
+            "cpu": "host",
+            "vga": "virtio",
+            "display": "gtk",
+            "net": "user",
+            "usb": "on",
+            "usbdevice": "tablet",
+            "accelerate": "kvm",
+            "audio": "pa",
+        }'''
+        
+        new_params = '''        # Default QEMU parameters
+        self.params = {
+            "memory": "2048",
+            "smp": "4",
+            "hda": "",
+            "cpu": "host",
+            "vga": "std",  # Changed from virtio to std for wider compatibility
+            "display": "sdl",  # Changed from gtk to sdl for Windows compatibility
+            "net": "user",
+            "usb": "on",
+            "usbdevice": "tablet",
+            # Removed accelerate=kvm as it's not available on Windows
+            # Removed audio=pa as PulseAudio is not available on Windows
+        }'''
+        
+        content = content.replace(old_params, new_params)
+        windows_params_updated = True
+    
+    # Fix process creation on Windows
+    windows_process_updated = False
+    if "self.qemu_process = subprocess.Popen(" in content and "shell=True" not in content:
+        old_code = '''        try:
+            self.qemu_process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            self.is_running = True
+            logger.info(f"QEMU started with PID {self.qemu_process.pid}")
+            return True
+        except Exception as e:
+            logger.error(f"Error starting QEMU: {str(e)}")
+            return False'''
+        
+        new_code = '''        try:
+            # Check platform for Windows-specific behaviors
+            import platform
+            if platform.system() == "Windows":
+                # On Windows, start the process with shell=True and without pipes to ensure proper window creation
+                # and prevent console window from showing and hiding immediately
+                startupinfo = None
+                try:
+                    # Import Windows-specific modules if available
+                    import subprocess
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 1  # SW_SHOWNORMAL
+                except (ImportError, AttributeError):
+                    pass  # Not on Windows or older Python version
+                
+                # Use creationflags to ensure the window stays open
+                creation_flags = subprocess.CREATE_NEW_CONSOLE
+                
+                # Run with shell=True to handle any path issues
+                cmd_str = " ".join(f'"{c}"' if " " in str(c) else str(c) for c in cmd)
+                logger.info(f"Windows command string: {cmd_str}")
+                
+                self.qemu_process = subprocess.Popen(
+                    cmd_str, 
+                    shell=True,
+                    startupinfo=startupinfo,
+                    creationflags=creation_flags
+                )
+            else:
+                # On Linux/macOS, use the standard approach
+                self.qemu_process = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+                
+            self.is_running = True
+            logger.info(f"QEMU started with PID {self.qemu_process.pid}")
+            return True
+        except Exception as e:
+            logger.error(f"Error starting QEMU: {str(e)}")
+            # Log more details in case of error
+            import traceback
+            logger.error(f"Detailed error: {traceback.format_exc()}")
+            return False'''
+        
+        content = content.replace(old_code, new_code)
+        windows_process_updated = True
+    
+    if not windows_params_updated and not windows_process_updated:
+        print("No QEMU Windows compatibility issues found or changes already applied.")
+        return True
+    
+    # Back up the original file
+    backup_path = qemu_wrapper_path + ".bak"
+    with open(backup_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Original QEMUWrapper file backed up to {backup_path}")
+    
+    # Write the fixed content
+    with open(qemu_wrapper_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    
+    print(f"Windows compatibility added to {qemu_wrapper_path}")
     return True
 
 if __name__ == "__main__":
@@ -402,8 +539,18 @@ if __name__ == "__main__":
     print("2. Missing simulation_parameters in sensor profiles")
     print("3. KeyError 'baseline' in SensorSimulator._simulation_loop")
     print("4. FridaManager.load_script compatibility")
+    print("5. QEMU window not appearing on Windows (display/acceleration issues)")
     print()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     success = fix_emulator()
+    
+    # Also fix Windows-specific QEMU issues
+    import platform
+    if platform.system() == "Windows":
+        print("\nDetected Windows system, applying QEMU compatibility fixes...")
+        fix_qemu_windows_issues()
+    else:
+        print("\nNot running on Windows, skipping Windows-specific QEMU fixes")
+    
     sys.exit(0 if success else 1)
