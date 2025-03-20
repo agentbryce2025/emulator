@@ -49,7 +49,12 @@ class QEMUWrapper:
             common_paths = [
                 "C:\\Program Files\\qemu\\qemu-system-x86_64.exe",
                 "C:\\Program Files (x86)\\qemu\\qemu-system-x86_64.exe",
-            ,
+                os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.environ.get("ProgramW6432", "C:\\Program Files"), "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.path.expanduser("~"), "Desktop", "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.path.expanduser("~"), "Documents", "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.path.expanduser("~"), "Downloads", "qemu", "qemu-system-x86_64.exe"),
                 os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "qemu", "qemu-system-x86_64.exe"),
                 os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "qemu", "qemu-system-x86_64.exe"),
                 os.path.join(os.environ.get("ProgramW6432", "C:\\Program Files"), "qemu", "qemu-system-x86_64.exe"),
