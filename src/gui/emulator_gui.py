@@ -535,6 +535,38 @@ class EmulatorGUI(QMainWindow):
             logging.getLogger().setLevel(logging.INFO)
             logger.info("Debug logging disabled")
             
+    def _configure_display_settings(self):
+        """Configure optimal display settings based on platform."""
+        import platform
+        
+        # Default settings
+        self.qemu.set_param("vga", "virtio")
+        self.qemu.set_param("display", "sdl")
+        
+        # Windows-specific settings to fix UI display issues
+        if platform.system() == "Windows":
+            logger.info("Configuring Windows-specific display settings")
+            
+            # Set audio to none to avoid issues on Windows
+            self.qemu.set_param("audio", "none")
+            
+            # Check if we should use VNC for display
+            if self.enable_vnc_checkbox.isChecked():
+                # If VNC is enabled, use it as the primary display method
+                self.qemu.set_param("display", "none")
+                logger.info("Using VNC for display output")
+            else:
+                # Configure SDL display for best compatibility on Windows
+                self.qemu.set_param("display", "sdl")
+                logger.info("Using SDL for display output")
+            
+            # Use VIRTIO VGA for best performance with Android
+            self.qemu.set_param("vga", "virtio")
+        elif platform.system() == "Linux":
+            # On Linux, use GTK for a better integration with the desktop
+            self.qemu.set_param("display", "gtk")
+            logger.info("Using GTK display for Linux")
+            
     def save_logs(self):
         """Save logs to file."""
         file_path, _ = QFileDialog.getSaveFileName(
@@ -698,6 +730,9 @@ class EmulatorGUI(QMainWindow):
             
         self.qemu.set_param("memory", str(self.memory_spinner.value()))
         self.qemu.set_param("smp", str(self.cores_spinner.value()))
+        
+        # Configure display parameters
+        self._configure_display_settings()
         
         # KVM acceleration if enabled
         if self.enable_kvm_checkbox.isChecked():

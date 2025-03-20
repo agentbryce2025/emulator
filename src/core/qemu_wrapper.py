@@ -28,13 +28,13 @@ class QEMUWrapper:
             "smp": "4",
             "hda": "",
             "cpu": "host",
-            "vga": "std",  # Changed from virtio to std for wider compatibility
-            "display": "sdl",  # Changed from gtk to sdl for Windows compatibility
+            "vga": "virtio",  # Using virtio again for better performance
+            "display": "sdl",  # SDL display for Windows compatibility
             "net": "user",
             "usb": "on",
             "usbdevice": "tablet",
+            "audio": "none",  # Disable audio by default to avoid issues
             # Removed accelerate=kvm as it's not available on Windows
-            # Removed audio=pa as PulseAudio is not available on Windows
         }
         
         # Default QEMU path
@@ -154,30 +154,27 @@ class QEMUWrapper:
             # Check platform for Windows-specific behaviors
             import platform
             if platform.system() == "Windows":
-                # On Windows, start the process with shell=True and without pipes to ensure proper window creation
-                # and prevent console window from showing and hiding immediately
-                startupinfo = None
-                try:
-                    # Import Windows-specific modules if available
-                    import subprocess
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 1  # SW_SHOWNORMAL
-                except (ImportError, AttributeError):
-                    pass  # Not on Windows or older Python version
+                # Special handling for Windows to ensure the UI displays properly
                 
-                # Use creationflags to ensure the window stays open
-                creation_flags = subprocess.CREATE_NEW_CONSOLE
+                # Make sure SDL display is explicitly set for Windows
+                self.params["display"] = "sdl"
                 
-                # Run with shell=True to handle any path issues
+                # Regenerate the command with updated display setting
+                cmd = self.build_command()
+                
+                # Format command for Windows shell
                 cmd_str = " ".join(f'"{c}"' if " " in str(c) else str(c) for c in cmd)
                 logger.info(f"Windows command string: {cmd_str}")
                 
+                # Create a visible window that stays open
+                import subprocess
+                from subprocess import CREATE_NEW_CONSOLE
+                
+                # Start the process in a way that keeps the window visible
                 self.qemu_process = subprocess.Popen(
-                    cmd_str, 
+                    cmd_str,
                     shell=True,
-                    startupinfo=startupinfo,
-                    creationflags=creation_flags
+                    creationflags=CREATE_NEW_CONSOLE
                 )
             else:
                 # On Linux/macOS, use the standard approach
@@ -194,17 +191,19 @@ class QEMUWrapper:
             import traceback
             logger.error(f"Detailed error: {traceback.format_exc()}")
             
-            # If the standard launch failed, try the direct_launch approach
+            # If the standard launch failed, try an alternative approach for Windows
             if platform.system() == "Windows":
-                logger.info("Standard QEMU launch failed, trying direct launcher approach...")
+                logger.info("Standard QEMU launch failed, trying alternative approach...")
                 
                 try:
-                    # Construct command parameters from our current params
+                    # Try with a different display setting
+                    self.params["display"] = "gtk"
                     cmd = self.build_command()
+                    
+                    # Format command for Windows PowerShell
                     cmd_str = " ".join(f'"{c}"' if " " in str(c) and isinstance(c, str) else str(c) for c in cmd)
                     
-                    # Use the direct launcher technique of creating a fully visible process
-                    # This is a more aggressive approach for Windows
+                    # Start with maximum visibility
                     import subprocess
                     from subprocess import CREATE_NEW_CONSOLE
                     
@@ -215,10 +214,33 @@ class QEMUWrapper:
                     )
                     
                     self.is_running = True
-                    logger.info(f"QEMU started with direct launcher, PID: {self.qemu_process.pid}")
+                    logger.info(f"QEMU started with alternative approach, PID: {self.qemu_process.pid}")
                     return True
                 except Exception as e2:
-                    logger.error(f"Error during fallback launch: {str(e2)}")
+                    logger.error(f"Error during alternative launch: {str(e2)}")
+                    
+                    # Final fallback to the most basic approach
+                    try:
+                        # Use the simplest command format with no display redirection
+                        self.params["display"] = "none"  # Disable GUI temporarily
+                        self.params["vnc"] = ":0"  # Enable VNC server on port 5900
+                        cmd = self.build_command()
+                        cmd_str = " ".join(f'"{c}"' if " " in str(c) and isinstance(c, str) else str(c) for c in cmd)
+                        
+                        self.qemu_process = subprocess.Popen(
+                            cmd_str,
+                            shell=True,
+                            creationflags=CREATE_NEW_CONSOLE
+                        )
+                        
+                        self.is_running = True
+                        logger.info(f"QEMU started with VNC fallback, PID: {self.qemu_process.pid}")
+                        logger.info("Connect to the emulator using a VNC client at localhost:5900")
+                        
+                        # Show a message about VNC usage (in main thread)
+                        return True
+                    except Exception as e3:
+                        logger.error(f"All launch attempts failed: {str(e3)}")
             
             return False
             

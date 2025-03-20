@@ -127,19 +127,29 @@ If you encounter problems with the GUI display:
 #### Windows QEMU Window Not Appearing
 If you're on Windows and the QEMU window (Android phone interface) doesn't appear:
 
-1. **Use the Enhanced Windows Launcher**:
+1. **Use the new Run Emulator batch file**:
    ```
-   enhanced_windows_launcher.bat
+   run_emulator.bat
    ```
-   This provides options for different launch methods and troubleshooting.
+   This will automatically configure and launch the emulator with proper display settings.
 
-2. **Apply Windows-specific fixes**:
+2. **Apply the Windows Display Fix**:
+   ```
+   python windows_display_fix.py
+   ```
+   This utility will fix your QEMU configuration for proper display on Windows.
+
+3. **Use the Improved Windows Launcher**:
+   ```
+   python improved_windows_launcher.py
+   ```
+   This enhanced launcher specifically addresses Windows display issues.
+
+4. **Alternative options if the above methods don't work**:
    ```
    python windows_gui_fix_fixed.py
    ```
-   This applies several fixes specifically for Windows display issues.
-
-3. **Use Direct Launcher** as a fallback:
+   or
    ```
    python direct_launch.py
    ```
@@ -147,13 +157,12 @@ If you're on Windows and the QEMU window (Android phone interface) doesn't appea
    ```
    run_qemu.bat
    ```
-   These launchers use Windows-friendly settings to ensure the QEMU window appears.
 
-4. **Check QEMU Installation**: Make sure QEMU is properly installed at one of these locations:
+5. **Check QEMU Installation**: Make sure QEMU is properly installed at one of these locations:
    - `C:\Program Files\qemu\qemu-system-x86_64.exe`
    - `C:\Program Files (x86)\qemu\qemu-system-x86_64.exe`
 
-For detailed information, see the `WINDOWS_GUI_FIX.md` file.
+For detailed Windows setup instructions, see the new `README_WINDOWS.md` file.
 
 ## Project Goals
 
