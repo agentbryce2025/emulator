@@ -124,6 +124,37 @@ If you encounter problems with the GUI display:
 
 3. **Scaling problems**: On high DPI displays, try setting the environment variable: `QT_AUTO_SCREEN_SCALE_FACTOR=1`
 
+#### Windows QEMU Window Not Appearing
+If you're on Windows and the QEMU window (Android phone interface) doesn't appear:
+
+1. **Use the Enhanced Windows Launcher**:
+   ```
+   enhanced_windows_launcher.bat
+   ```
+   This provides options for different launch methods and troubleshooting.
+
+2. **Apply Windows-specific fixes**:
+   ```
+   python windows_gui_fix_fixed.py
+   ```
+   This applies several fixes specifically for Windows display issues.
+
+3. **Use Direct Launcher** as a fallback:
+   ```
+   python direct_launch.py
+   ```
+   or
+   ```
+   run_qemu.bat
+   ```
+   These launchers use Windows-friendly settings to ensure the QEMU window appears.
+
+4. **Check QEMU Installation**: Make sure QEMU is properly installed at one of these locations:
+   - `C:\Program Files\qemu\qemu-system-x86_64.exe`
+   - `C:\Program Files (x86)\qemu\qemu-system-x86_64.exe`
+
+For detailed information, see the `WINDOWS_GUI_FIX.md` file.
+
 ## Project Goals
 
 1. Create a fully functional Android emulator with a visual GUI

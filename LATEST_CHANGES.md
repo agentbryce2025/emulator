@@ -1,5 +1,26 @@
 # Latest Changes - March 2025
 
+## Windows GUI Fix (March 20, 2025)
+
+We've added significant improvements to resolve issues with the QEMU window not appearing on Windows systems.
+
+### Fixes Implemented:
+
+1. **Enhanced Windows Launcher**: Added `enhanced_windows_launcher.bat` with a menu-based interface for easy launching and troubleshooting.
+2. **Improved QEMU Process Creation**: Modified how QEMU is launched on Windows to ensure the window appears and stays visible.
+3. **Fallback Launching Mechanism**: Added a fallback approach when standard QEMU launching fails on Windows.
+4. **Enhanced Path Detection**: Added more robust QEMU executable path detection on Windows systems.
+5. **Window Monitoring System**: Added code to detect when the QEMU window fails to appear and provide guidance.
+6. **Comprehensive Documentation**: Added detailed instructions in `WINDOWS_GUI_FIX.md`.
+
+### User Experience Improvements:
+
+1. **Better Error Messages**: Added user-friendly error messages and troubleshooting suggestions.
+2. **Alternative Launch Methods**: Provided multiple ways to launch the emulator on Windows.
+3. **Automated Troubleshooting**: Added a troubleshooting option in the enhanced launcher.
+
+For detailed information on using these improvements, see `WINDOWS_GUI_FIX.md`.
+
 ## Machine Learning Sensor Data Generation
 
 The undetected Android emulator now includes a sophisticated machine learning component for generating realistic sensor data patterns. This enhancement significantly improves our ability to bypass emulator detection mechanisms that rely on analyzing sensor data patterns.

@@ -49,7 +49,13 @@ class QEMUWrapper:
             common_paths = [
                 "C:\\Program Files\\qemu\\qemu-system-x86_64.exe",
                 "C:\\Program Files (x86)\\qemu\\qemu-system-x86_64.exe",
-            ]
+            ,
+                os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.environ.get("ProgramW6432", "C:\\Program Files"), "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.path.expanduser("~"), "Desktop", "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.path.expanduser("~"), "Documents", "qemu", "qemu-system-x86_64.exe"),
+                os.path.join(os.path.expanduser("~"), "Downloads", "qemu", "qemu-system-x86_64.exe"),]
             
             # Check if we loaded a path from config
             if hasattr(self, "qemu_path") and os.path.exists(self.qemu_path):
@@ -182,6 +188,33 @@ class QEMUWrapper:
             # Log more details in case of error
             import traceback
             logger.error(f"Detailed error: {traceback.format_exc()}")
+            
+            # If the standard launch failed, try the direct_launch approach
+            if platform.system() == "Windows":
+                logger.info("Standard QEMU launch failed, trying direct launcher approach...")
+                
+                try:
+                    # Construct command parameters from our current params
+                    cmd = self.build_command()
+                    cmd_str = " ".join(f'"{c}"' if " " in str(c) and isinstance(c, str) else str(c) for c in cmd)
+                    
+                    # Use the direct launcher technique of creating a fully visible process
+                    # This is a more aggressive approach for Windows
+                    import subprocess
+                    from subprocess import CREATE_NEW_CONSOLE
+                    
+                    self.qemu_process = subprocess.Popen(
+                        cmd_str,
+                        shell=True,
+                        creationflags=CREATE_NEW_CONSOLE
+                    )
+                    
+                    self.is_running = True
+                    logger.info(f"QEMU started with direct launcher, PID: {self.qemu_process.pid}")
+                    return True
+                except Exception as e2:
+                    logger.error(f"Error during fallback launch: {str(e2)}")
+            
             return False
             
     def stop(self):
