@@ -10,6 +10,11 @@
    - Applied Windows-specific GUI fixes to ensure the QEMU window appears properly on Windows systems
    - Enhanced the QEMU startup process for Windows compatibility
 
+3. **Frida Monitoring Inconsistency**:
+   - Fixed inconsistent log messages in the Frida monitoring functionality
+   - The log showed: "Cannot start monitoring: No target package or script content set" followed by "Frida monitoring started for com.linkedin.android"
+   - The emulator GUI was not properly setting the target package before starting Frida monitoring
+
 ## Changes Made
 
 1. **Fixed Syntax Error**:
@@ -23,7 +28,12 @@
    - Added Windows-specific QEMU window monitoring in the main.py file
    - Created an enhanced Windows launcher (enhanced_windows_launcher.bat)
 
-3. **Testing**:
+3. **Fixed Frida Monitoring Issues**:
+   - Modified `src/gui/emulator_gui.py` to explicitly set the target package before starting Frida monitoring
+   - Added conditional logging to only report success if the monitoring actually started
+   - Ensures consistent behavior between log messages and actual functionality
+
+4. **Testing**:
    - Verified the fixes using the test_windows_fix.py script
    - Confirmed that the emulator runs properly after fixes were applied
 
