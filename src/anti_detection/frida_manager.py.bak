@@ -261,24 +261,15 @@ class FridaManager:
         
     def start_monitoring(self):
         """Start monitoring for target app launch and inject scripts."""
-        if not self.target_package:
-            # Use a default Android launcher as the target if none is specified
-            self.target_package = "com.android.launcher"
-            logger.info(f"No target package set, using default: {self.target_package}")
-            
-        if not self.script_content:
-            # Use a default empty script if none is provided
-            self.script_content = """
-            // Default Frida script that does nothing but allows the emulator to start
-            console.log('Default Frida script loaded');
-            """
-            logger.info("No script content set, using default empty script")
-            
-        logger.info(f"Monitoring started for package: {self.target_package}")
-        # In a real implementation, this would start a background thread
-        # that checks for the app to launch, then injects the script.
-        # For compatibility purposes, we'll just log that it's started.
-        return True
+        if self.target_package and self.script_content:
+            logger.info(f"Monitoring started for package: {self.target_package}")
+            # In a real implementation, this would start a background thread
+            # that checks for the app to launch, then injects the script.
+            # For compatibility purposes, we'll just log that it's started.
+            return True
+        else:
+            logger.warning("Cannot start monitoring: No target package or script content set")
+            return False
             
     def close(self):
         """Clean up resources before shutting down."""

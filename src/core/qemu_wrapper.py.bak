@@ -132,25 +132,6 @@ class QEMUWrapper:
         """Build the QEMU command line."""
         cmd = [self.qemu_path]
         
-        # Add Android-specific boot parameters to skip setup wizard and go directly to the launcher
-        android_boot_params = {
-            "append": "quiet androidboot.hardware=android_x86_64 androidboot.selinux=permissive skipsetup=1 nomodeset"
-        }
-        
-        # Combine the Android boot params with user params
-        all_params = {**self.params, **android_boot_params}
-        
-        for key, value in all_params.items():
-            if value == "on":
-                cmd.append(f"-{key}")
-            elif value:
-                cmd.append(f"-{key}")
-                cmd.append(value)
-                
-        return cmd
-        """Build the QEMU command line."""
-        cmd = [self.qemu_path]
-        
         for key, value in self.params.items():
             if value == "on":
                 cmd.append(f"-{key}")

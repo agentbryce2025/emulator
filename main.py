@@ -168,11 +168,11 @@ def run_headless(args):
         frida_manager.load_script(args.frida_script)
         logger.info(f"Loaded custom Frida script: {args.frida_script}")
     else:
-        # Load default script
+        # Load default launcher script to ensure phone UI starts
         default_script = os.path.join(os.path.dirname(__file__), 
-                                    "src", "anti_detection", "frida_scripts", "detection_bypass.js")
+                                    "src", "anti_detection", "frida_scripts", "default_launcher.js")
         frida_manager.load_script(default_script)
-        logger.info("Loaded default Frida detection bypass script")
+        logger.info("Loaded default launcher script for Android UI")
     
     # Set target app if specified
     if args.target_app:
