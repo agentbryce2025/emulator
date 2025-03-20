@@ -772,8 +772,12 @@ class EmulatorGUI(QMainWindow):
                             
                         # Start monitoring for app launch if applicable
                         if hasattr(self.frida_manager, "start_monitoring"):
-                            self.frida_manager.start_monitoring()
-                            logger.info(f"Frida monitoring started for {target_app}")
+                            # Set the target package and script content first
+                            self.frida_manager.set_target_package(target_app)
+                            # Only log success if start_monitoring actually succeeds
+                            if self.frida_manager.start_monitoring():
+                                logger.info(f"Frida monitoring started for {target_app}")
+                            # The warning is already logged in the frida_manager.start_monitoring method
                         else:
                             logger.warning("Frida monitoring not available in this version")
                     except Exception as e:
